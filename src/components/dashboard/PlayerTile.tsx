@@ -1,0 +1,455 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Play, Pause, SkipBack, SkipForward, ListMusic, MoreVertical, Volume2, VolumeX, Infinity, Trash2, Shuffle, Menu, History } from "lucide-react";
+import YouTube, { YouTubeProps } from "react-youtube";
+import axios from "axios";
+import { usePlayerStore, Track, PlaylistHistoryItem } from "@/store/usePlayerStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
+
+export function PlayerTile() {
+    const {
+        currentTrack,
+        isPlaying,
+        queue,
+        play,
+        pause,
+        togglePlay,
+        nextTrack,
+        prevTrack,
+        clearQueue,
+        shuffleQueue,
+        playlistHistory,
+        setCurrentTrack,
+        setQueue,
+        triggerCreatorReset
+    } = usePlayerStore();
+
+    const { volume } = useSettingsStore();
+
+    const [player, setPlayer] = useState<any>(null);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // Progress bar state
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [isSeeking, setIsSeeking] = useState(false);
+
+    // Infinite fetching state
+    const [isFetchingInfinite, setIsFetchingInfinite] = useState(false);
+
+    // Keep volume in sync with store
+    useEffect(() => {
+        if (player && isPlayerReady) {
+            try {
+                if (typeof player.setVolume === 'function') {
+                    player.setVolume(volume);
+                }
+            } catch (err) {
+                console.warn("YouTube player.setVolume error:", err);
+            }
+        }
+    }, [volume, player, isPlayerReady]);
+
+    // Handle React-Youtube Events
+    const onReady: YouTubeProps['onReady'] = (event) => {
+        setPlayer(event.target);
+        setIsPlayerReady(true);
+        try {
+            if (typeof event.target.setVolume === 'function') {
+                event.target.setVolume(volume);
+            }
+            // Manually load initial video
+            if (currentTrack?.id && typeof event.target.loadVideoById === 'function') {
+                event.target.loadVideoById(currentTrack.id);
+            } else if (isPlaying && typeof event.target.playVideo === 'function') {
+                event.target.playVideo();
+            }
+        } catch (err) {
+            console.warn("YouTube player onReady init error:", err);
+        }
+    };
+
+    const onStateChange: YouTubeProps['onStateChange'] = (event) => {
+        // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
+        if (event.data === 1 && !isPlaying) {
+            play();
+        } else if (event.data === 2 && isPlaying) {
+            pause();
+        } else if (event.data === 0) {
+            nextTrack();
+            // SYNCHRONOUSLY load next track to preserve background media session in Chrome
+            const storeState = usePlayerStore.getState();
+            if (storeState.currentTrack && event.target && typeof event.target.loadVideoById === 'function') {
+                try {
+                    event.target.loadVideoById(storeState.currentTrack.id);
+                } catch (err) { }
+            }
+        } else if (event.data === 5 && isPlaying) {
+            // Force play when video enters "cued" state
+            try {
+                if (typeof event.target.playVideo === 'function') {
+                    event.target.playVideo();
+                }
+            } catch (err) { }
+        }
+    };
+
+    // Progress bar polling
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isPlaying && player && isPlayerReady && !isSeeking) {
+            interval = setInterval(async () => {
+                try {
+                    if (typeof player.getCurrentTime === 'function') {
+                        const current = await player.getCurrentTime();
+                        const dur = await player.getDuration();
+                        setCurrentTime(current || 0);
+                        setDuration(dur || 0);
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isPlaying, player, isPlayerReady, isSeeking]);
+
+    // Handle seeking
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const time = parseFloat(e.target.value);
+        setCurrentTime(time);
+        if (player && typeof player.seekTo === 'function') {
+            player.seekTo(time, true);
+        }
+    };
+
+    // Keep iframe state in sync with Zustand natively
+    useEffect(() => {
+        if (player && isPlayerReady) {
+            try {
+                // Sync Track ID
+                if (currentTrack?.id) {
+                    const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
+                    const playingId = videoData?.video_id;
+                    if (playingId && playingId !== currentTrack.id) {
+                        if (typeof player.loadVideoById === 'function') {
+                            player.loadVideoById(currentTrack.id);
+                        }
+                    } else if (!playingId) {
+                        if (typeof player.loadVideoById === 'function') {
+                            player.loadVideoById(currentTrack.id);
+                        }
+                    }
+                }
+
+                // Sync Play/Pause
+                if (isPlaying && typeof player.playVideo === 'function') {
+                    player.playVideo();
+                } else if (!isPlaying && typeof player.pauseVideo === 'function') {
+                    player.pauseVideo();
+                }
+            } catch (err) {
+                console.warn("YouTube Player Sync Error:", err);
+            }
+        }
+    }, [isPlaying, currentTrack, player, isPlayerReady]);
+
+    // Infinite Playlist Logic
+    const { isInfinite, infiniteArtists, addTracksToQueue, history } = usePlayerStore();
+
+    // Use a ref to track the last pop count we successfully fetched for, to prevent duplicate fetches
+    useEffect(() => {
+        const fetchMoreTracks = async () => {
+            // Only fetch if infinite mode is on, we have artists, an API key, and the queue is totally empty
+            if (!isInfinite || infiniteArtists.length === 0 || isFetchingInfinite) return;
+            if (queue.length > 0) return; // Wait until all tracks up next are played
+
+            setIsFetchingInfinite(true);
+            try {
+                const apiArtists = infiniteArtists.map(name => ({ name }));
+                const res = await axios.post("/api/youtube/generate", {
+                    artists: apiArtists,
+                    durationMinutes: 120, // Add 2 hours in batch
+                });
+
+                if (res?.data?.playlist && Array.isArray(res.data.playlist)) {
+                    // Filter out tracks that are currently playing, or already played
+                    const excludeIds = new Set([
+                        currentTrack?.id,
+                        ...history.map(t => t.id)
+                    ]);
+
+                    const potentialTracks: Track[] = res.data.playlist.map((t: any) => ({
+                        id: String(t.id || ""),
+                        title: String(t.title || "Unknown Title"),
+                        artist: String(t.artist || "Unknown Artist"),
+                        thumbnailUrl: String(t.thumbnailUrl || ""),
+                        durationString: t.durationString ? String(t.durationString) : undefined
+                    })).filter((t: Track) => t.id && !excludeIds.has(t.id));
+
+                    if (potentialTracks.length > 0) {
+                        addTracksToQueue(potentialTracks);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to fetch infinite track batch", err);
+            } finally {
+                setIsFetchingInfinite(false);
+            }
+        };
+
+        // When queue length hits 0 (i.e. we are playing the very last track in the list)
+        if (queue.length === 0 && isInfinite && currentTrack) {
+            fetchMoreTracks();
+        }
+    }, [queue.length, isInfinite, isFetchingInfinite, infiniteArtists, currentTrack, history, addTracksToQueue]);
+
+    const opts: YouTubeProps['opts'] = {
+        height: '100%',
+        width: '100%',
+        playerVars: {
+            autoplay: isPlaying ? 1 : 0,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            modestbranding: 1,
+            rel: 0,
+            iv_load_policy: 3,
+        },
+    };
+
+    // Avoid Hydration Errors for persisted Zustand state
+    const [mounted, setMounted] = useState(false);
+
+    // Close menu when clicking outside
+    const menuRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => setMounted(true), []);
+    if (!mounted) return <div className="glass-tile w-full h-full animate-pulse"></div>;
+
+    const bgImage = currentTrack?.thumbnailUrl ? `url("${currentTrack.thumbnailUrl}")` : 'none';
+
+    return (
+        <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6">
+            {/* Background with strong blur (simulated thumbnail from current track) */}
+            <div
+                className="absolute inset-0 bg-cover bg-center opacity-40 blur-3xl saturate-[2] brightness-125 z-0 transition-all duration-1000 bg-black mix-blend-screen"
+                style={{ backgroundImage: bgImage }}
+            ></div>
+
+            {/* Left: Player Section */}
+            <div className="relative z-10 flex flex-col h-full flex-1 md:border-r border-white/10 md:pr-6">
+                <h2 className="text-xl font-bold text-white mb-auto drop-shadow-sm flex items-center justify-between">
+                    Player
+                </h2>
+
+                {/* Video Area */}
+                <div className="flex-1 flex flex-col items-center justify-center my-4">
+                    <div className="w-64 lg:w-[400px] aspect-video bg-black/80 rounded-xl shadow-2xl border border-white/10 flex flex-col items-center justify-center overflow-hidden relative group-hover:shadow-2xl group-hover:shadow-accent/30 transition-shadow duration-500">
+                        {currentTrack && currentTrack.id ? (
+                            <div className="w-full h-full pointer-events-none opacity-80 z-10 relative">
+                                {mounted && (
+                                    <YouTube
+                                        opts={opts}
+                                        onReady={onReady}
+                                        onStateChange={onStateChange}
+                                        onError={(e) => console.error("YouTube Player errored:", e)}
+                                        className="w-full h-full absolute inset-0 transform scale-[1.5]" // Scale to hide borders
+                                        iframeClassName="w-full h-full"
+                                    />
+                                )}
+                            </div>
+                        ) : (
+                            <span className="text-white/40 text-sm font-medium tracking-wide">No Track Selected</span>
+                        )}
+
+                        {/* Overlay to catch clicks and prevent pausing from iframe */}
+                        <div className="absolute inset-0 z-20 cursor-pointer" onClick={togglePlay}></div>
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex flex-col items-center justify-center mt-auto pb-4 gap-4 w-full">
+                    {/* Progress Bar */}
+                    {currentTrack && (
+                        <div className="w-full max-w-[90%] flex items-center gap-3 text-[10px] text-gray-400 font-mono mt-2">
+                            <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
+                            <div className="relative flex-1 h-3 group/slider cursor-pointer flex items-center">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max={duration || 100}
+                                    value={currentTime}
+                                    onChange={handleSeek}
+                                    onMouseDown={() => setIsSeeking(true)}
+                                    onMouseUp={() => setIsSeeking(false)}
+                                    onTouchStart={() => setIsSeeking(true)}
+                                    onTouchEnd={() => setIsSeeking(false)}
+                                    className="absolute w-full h-full opacity-0 cursor-pointer z-20"
+                                />
+                                <div className="w-full h-1 bg-white/30 rounded-full relative">
+                                    <div
+                                        className="h-full bg-accent group-hover/slider:bg-accent-foreground transition-colors rounded-full"
+                                        style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                                    />
+                                    {/* Circular Thumb */}
+                                    <div
+                                        className="w-3 h-3 bg-white rounded-full absolute top-1/2 -translate-y-1/2 -translate-x-1.5 shadow-sm pointer-events-none transition-transform group-hover/slider:scale-125"
+                                        style={{ left: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                                    ></div>
+                                </div>
+                            </div>
+                            <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col items-center gap-1 text-center max-w-[90%]">
+                        <h3 className="text-white font-semibold text-lg drop-shadow-md line-clamp-1 w-full" title={currentTrack?.title || "Perpl Player"}>
+                            {currentTrack?.title || "Perpl Player"}
+                        </h3>
+                        <p className="text-gray-400 text-sm line-clamp-1">{currentTrack?.artist || "Load a playlist to start"}</p>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-6">
+                        <button
+                            onClick={prevTrack}
+                            className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+                        >
+                            <SkipBack className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={togglePlay}
+                            disabled={!currentTrack || !currentTrack.id}
+                            className="p-4 rounded-full bg-accent hover:bg-accent/80 transition-all transform hover:scale-105 shadow-lg shadow-accent/20 disabled:opacity-50 disabled:hover:scale-100"
+                        >
+                            {isPlaying ? (
+                                <Pause className="w-7 h-7 text-white fill-current" />
+                            ) : (
+                                <Play className="w-7 h-7 text-white fill-current translate-x-0.5" />
+                            )}
+                        </button>
+                        <button
+                            onClick={nextTrack}
+                            className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+                        >
+                            <SkipForward className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right: Up Next Section */}
+            <div className="relative z-10 flex flex-col h-full w-full md:w-64 lg:w-80 shrink-0">
+                <div className="flex items-center justify-between mb-4 relative" ref={menuRef}>
+                    <h2 className="text-lg font-bold text-accent-foreground flex items-center gap-2">
+                        <span>Up Next</span>
+                        <ListMusic className="w-4 h-4 text-accent opacity-70" />
+                    </h2>
+
+                    <div className="flex items-center gap-1">
+                        {/* Infinite Status Icon */}
+                        <div className="p-1 relative z-20 flex items-center justify-center" title={isInfinite ? "Infinite Mode Active" : "Infinite Mode Off"}>
+                            <Infinity className={`w-5 h-5 transition-all duration-500 ${isInfinite ? 'text-accent brightness-150 drop-shadow-[0_0_8px_var(--accent)]' : 'text-black drop-shadow-none'}`} />
+                        </div>
+
+                        {/* Hamburger Menu */}
+                        <button
+                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                            className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative z-20"
+                        >
+                            <Menu className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Dropdown */}
+                    {isMenuOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-48 bg-black/90 border border-white/10 rounded-xl shadow-2xl py-2 z-30 backdrop-blur-xl">
+                            <button
+                                onClick={() => {
+                                    shuffleQueue();
+                                    setIsMenuOpen(false);
+                                }}
+                                disabled={!queue || queue.length < 2}
+                                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <Shuffle className="w-4 h-4 text-gray-400 group-hover:text-accent transition-colors" />
+                                プレイリストをシャッフル
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (window.confirm("プレイリストを削除しますか？")) {
+                                        clearQueue();
+                                        pause();
+                                        triggerCreatorReset();
+                                    }
+                                    setIsMenuOpen(false);
+                                }}
+                                disabled={!currentTrack && (!queue || queue.length === 0)}
+                                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-3 transition-colors mt-1 disabled:opacity-50 disabled:cursor-not-allowed group"
+                            >
+                                <Trash2 className="w-4 h-4 text-red-400/70 group-hover:text-red-400 transition-colors" />
+                                プレイリストを削除
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {!queue || !Array.isArray(queue) || queue.length === 0 ? (
+                        <div className="text-gray-500 text-sm italic text-center mt-10">
+                            Queue is empty
+                        </div>
+                    ) : (
+                        queue.map((track, i) => {
+                            if (!track || typeof track !== 'object') return null;
+                            const trackId = track.id ? String(track.id) : `unknown-${i}`;
+                            const title = track.title ? String(track.title) : "Unknown Title";
+                            const artist = track.artist ? String(track.artist) : "Unknown Artist";
+                            const thumb = track.thumbnailUrl ? String(track.thumbnailUrl) : "";
+
+                            return (
+                                <div key={`queue-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors group/item">
+                                    <div className="w-12 h-10 bg-black/40 rounded-md shrink-0 flex flex-col items-center justify-center relative overflow-hidden outline outline-1 outline-white/10">
+                                        {thumb && thumb.length > 5 ? (
+                                            <img
+                                                src={thumb}
+                                                alt={title}
+                                                className="w-full h-full object-cover opacity-80"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    e.currentTarget.src = '';
+                                                }}
+                                            />
+                                        ) : (
+                                            <span className="text-[8px] text-gray-500">No Img</span>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="text-sm font-semibold text-white truncate group-hover/item:text-[#8ebce3] transition-colors">
+                                            {title}
+                                        </span>
+                                        <div className="flex items-center text-[10px] text-gray-400 gap-2 mt-0.5">
+                                            <span className="truncate">{artist}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+
+        </div>
+    );
+}

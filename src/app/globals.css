@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --background: #080808;
+  --foreground: #eaeaea;
+  --accent: #9370db;
+  --accent-secondary: #8a2be2;
+  --accent-foreground: #ffffff;
+  --tile-bg: rgba(25, 25, 25, 0.5);
+  --tile-bg-hover: rgba(40, 40, 40, 0.65);
+  --tile-border: rgba(255, 255, 255, 0.05);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-tile: var(--tile-bg);
+  --color-tile-border: var(--tile-border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+@utility glass-tile {
+  background-color: var(--tile-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--tile-border);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+  &:hover {
+    background-color: var(--tile-bg-hover);
+  }
+}
+
+/* Custom Scrollbar for Up Next */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 1);
+}

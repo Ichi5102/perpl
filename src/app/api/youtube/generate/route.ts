@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 // Estimate 4 mins per song on average to calculate track count
 const AVG_SONG_DURATION_MINUTES = 4;
@@ -21,6 +22,9 @@ function isRateLimited(ip: string): boolean {
     entry.count++;
     return entry.count > RATE_LIMIT_MAX_REQUESTS;
 }
+
+// === Dev Memory Cache Fallback ===
+const devMemoryCache = new Map<string, { data: any, exp: number }>();
 
 // === Input Sanitization ===
 function sanitizeString(input: string): string {
@@ -103,6 +107,28 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
         }
 
+        // --- Cache Layer Initialization ---
+        let cacheGet = async (key: string): Promise<any> => {
+            const item = devMemoryCache.get(key);
+            if (item && item.exp > Date.now()) return item.data;
+            return null;
+        };
+        let cachePut = async (key: string, value: any): Promise<void> => {
+            devMemoryCache.set(key, { data: value, exp: Date.now() + 2592000000 });
+        };
+
+        try {
+            const { env } = getCloudflareContext();
+            if (env && (env as any).YOUTUBE_CACHE) {
+                const kv = (env as any).YOUTUBE_CACHE;
+                cacheGet = async (key) => await kv.get(key, 'json');
+                // Cache for 30 days (2592000 seconds)
+                cachePut = async (key, value) => await kv.put(key, JSON.stringify(value), { expirationTtl: 2592000 });
+            }
+        } catch (e) {
+            // Not in Cloudflare environment, using fallback memory cache
+        }
+
         // --- Input Validation ---
         if (!Array.isArray(artists) || artists.length > MAX_ARTISTS) {
             return NextResponse.json(
@@ -130,22 +156,45 @@ export async function POST(req: Request) {
                 const artistName = sanitizeString(String(artist.name || ''));
                 if (!artistName) continue;
 
-                const query = encodeURIComponent(`${artistName} official music video`);
-                const baseUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${Math.min(tracksPerArtist + 5, 25)}`;
-                const response = await fetchYouTubeWithRotation(baseUrl, apiKeys);
+                // --- CACHE CHECK ---
+                const cacheKey = `artist_tracks_${encodeURIComponent(artistName.toLowerCase())}`;
+                let tracks: any[] = [];
+                let cachedTracks: any[] | null = null;
 
-                const items = response.data?.items || [];
-                if (items.length === 0) {
-                    console.log(`No videos found for artist: ${artistName}`);
-                    continue;
+                try {
+                    cachedTracks = await cacheGet(cacheKey);
+                } catch (e) { console.error('Cache get error:', e); }
+
+                if (cachedTracks && Array.isArray(cachedTracks) && cachedTracks.length > 0) {
+                    console.log(`[Cache HIT] Skipping YouTube API for artist: ${artistName}`);
+                    tracks = cachedTracks;
+                } else {
+                    console.log(`[Cache MISS] Fetching from YouTube API for artist: ${artistName}`);
+                    const query = encodeURIComponent(`${artistName} official music video`);
+                    const baseUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${Math.min(tracksPerArtist + 5, 25)}`;
+                    const response = await fetchYouTubeWithRotation(baseUrl, apiKeys);
+
+                    const items = response.data?.items || [];
+                    if (items.length === 0) {
+                        console.log(`No videos found for artist: ${artistName}`);
+                        continue;
+                    }
+
+                    tracks = items.map((item: any) => ({
+                        id: item.id?.videoId || "",
+                        title: sanitizeString(String(item.snippet?.title || "Unknown Title")),
+                        artist: artistName,
+                        thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || "",
+                    })).filter((t: any) => t.id); // Ensure we actually have an ID
+
+                    // --- CACHE SAVE ---
+                    if (tracks.length > 0) {
+                        try {
+                            await cachePut(cacheKey, tracks);
+                            console.log(`[Cache SAVED] Saved YouTube results for artist: ${artistName}`);
+                        } catch (e) { console.error('Cache put error:', e); }
+                    }
                 }
-
-                const tracks = items.map((item: any) => ({
-                    id: item.id?.videoId || "",
-                    title: sanitizeString(String(item.snippet?.title || "Unknown Title")),
-                    artist: artistName,
-                    thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || "",
-                })).filter((t: any) => t.id); // Ensure we actually have an ID
 
                 // Shuffle tracks and take the required amount
                 const shuffledTracks = tracks.sort(() => 0.5 - Math.random()).slice(0, tracksPerArtist);

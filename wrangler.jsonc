@@ -16,12 +16,5 @@
             "binding": "WORKER_SELF_REFERENCE",
             "service": "perpl"
         }
-    ],
-    "kv_namespaces": [
-        {
-            "binding": "YOUTUBE_CACHE",
-            "id": "production-namespace-id-placeholder",
-            "preview_id": "preview-namespace-id-placeholder"
-        }
     ]
 }

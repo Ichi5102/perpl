@@ -37,12 +37,12 @@ export function HistoryTile() {
                 throw new Error("Invalid response from server");
             }
 
-            const playlist = res.data.playlist.map((track: any) => ({
+            const playlist = res.data.playlist.map((track: Record<string, unknown>) => ({
                 id: String(track.id || ""),
                 title: String(track.title || "Unknown Title"),
                 artist: String(track.artist || "Unknown Artist"),
                 thumbnailUrl: String(track.thumbnailUrl || ""),
-            })).filter((track: any) => track.id);
+            })).filter((track: { id: string }) => track.id);
 
             if (playlist.length > 0) {
                 setCurrentTrack(playlist[0]);
@@ -51,9 +51,10 @@ export function HistoryTile() {
             } else {
                 alert("Could not recreate the playlist. Try again.");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Failed to generate from history:", error);
-            const errMsg = error?.response?.data?.error || "Failed to generate playlist. Check your API keys.";
+            const axiosErr = error as { response?: { data?: { error?: string } } };
+            const errMsg = axiosErr?.response?.data?.error || "Failed to generate playlist. Check your API keys.";
             alert(errMsg);
         } finally {
             setIsGenerating(null);

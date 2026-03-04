@@ -48,8 +48,8 @@ export async function GET(req: Request) {
 
         if (response.data && response.data.results) {
             const names: string[] = response.data.results
-                .map((res: any) => res.artistName)
-                .filter((name: string) => name);
+                .map((res: { artistName?: string }) => res.artistName)
+                .filter((name: string | undefined): name is string => !!name);
 
             // Remove duplicates
             const uniqueNames = [...new Set(names)];
@@ -57,8 +57,8 @@ export async function GET(req: Request) {
         }
 
         return NextResponse.json({ results: [] });
-    } catch (error: any) {
-        console.error('iTunes API Error:', error.message);
+    } catch (error: unknown) {
+        console.error('iTunes API Error:', error instanceof Error ? error.message : String(error));
         return NextResponse.json({ results: [] });
     }
 }

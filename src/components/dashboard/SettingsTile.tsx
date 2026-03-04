@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Settings, Volume2, Globe } from "lucide-react";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { getTranslations } from "@/i18n";
+
+// SSR-safe hydration guard using useSyncExternalStore
+const emptySubscribe = () => () => { };
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export function SettingsTile() {
     const {
@@ -15,12 +20,8 @@ export function SettingsTile() {
 
     const t = getTranslations(locale);
 
-    // Local state to prevent hydration mismatch with Zustand persist
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    // Hydration-safe mount detection without useEffect+setState
+    const mounted = useSyncExternalStore(emptySubscribe, getClientSnapshot, getServerSnapshot);
 
     if (!mounted) return (
         <div className="glass-tile w-full h-full p-6 flex items-center justify-center">

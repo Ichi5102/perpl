@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import type { Track, PlaylistHistoryItem } from '@/store/usePlayerStore';
 
 // ============================================================
 // E2E Integration Test: サイト操作パターン網羅テスト
@@ -22,14 +23,14 @@ vi.mock('@/components/effects/BrownianMotionCanvas', () => ({
 
 // Shared mutable store state for integration testing
 const createMockStore = () => ({
-    currentTrack: null as any,
+    currentTrack: null as Track | null,
     isPlaying: false,
-    queue: [] as any[],
-    history: [] as any[],
+    queue: [] as Track[],
+    history: [] as Track[],
     isInfinite: false,
     infiniteArtists: [] as string[],
     artistHistory: [] as string[],
-    playlistHistory: [] as any[],
+    playlistHistory: [] as PlaylistHistoryItem[],
     resetCreatorTrigger: 0,
     setCurrentTrack: vi.fn(),
     play: vi.fn(),
@@ -354,8 +355,9 @@ describe('エラーハンドリング', () => {
                 artists: [{ name: 'X' }],
                 durationMinutes: 30,
             });
-        } catch (error: any) {
-            const errMsg = error?.response?.data?.error || 'Failed to generate playlist.';
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { error?: string } } };
+            const errMsg = axiosErr?.response?.data?.error || 'Failed to generate playlist.';
             expect(errMsg).toContain('quota exceeded');
         }
     });

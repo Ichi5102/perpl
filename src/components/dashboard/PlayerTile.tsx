@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, SkipBack, SkipForward, ListMusic, Infinity, Trash2, Shuffle, Menu } from "lucide-react";
-import YouTube, { YouTubeProps } from "react-youtube";
+import YouTube, { YouTubeProps, YouTubePlayer } from "react-youtube";
 import axios from "axios";
 import { usePlayerStore, Track } from "@/store/usePlayerStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -28,7 +28,7 @@ export function PlayerTile() {
     const { volume, locale } = useSettingsStore();
     const tr = getTranslations(locale);
 
-    const [player, setPlayer] = useState<any>(null);
+    const [player, setPlayer] = useState<YouTubePlayer | null>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -173,7 +173,7 @@ export function PlayerTile() {
                         ...history.map(t => t.id)
                     ]);
 
-                    const potentialTracks: Track[] = res.data.playlist.map((t: any) => ({
+                    const potentialTracks: Track[] = res.data.playlist.map((t: Record<string, unknown>) => ({
                         id: String(t.id || ""),
                         title: String(t.title || tr.unknownTitle),
                         artist: String(t.artist || "Unknown Artist"),
@@ -196,7 +196,7 @@ export function PlayerTile() {
         if (queue.length === 0 && isInfinite && currentTrack) {
             fetchMoreTracks();
         }
-    }, [queue.length, isInfinite, isFetchingInfinite, infiniteArtists, currentTrack, history, addTracksToQueue]);
+    }, [queue.length, isInfinite, isFetchingInfinite, infiniteArtists, currentTrack, history, addTracksToQueue, tr.unknownTitle]);
 
     const opts: YouTubeProps['opts'] = {
         height: '100%',
@@ -233,13 +233,13 @@ export function PlayerTile() {
     const bgImage = currentTrack?.thumbnailUrl ? `url("${currentTrack.thumbnailUrl}")` : 'none';
 
     return (
-        <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6 bg-black/80">
+        <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6">
             {/* Lightweight Background Overlay */}
             <div
-                className="absolute inset-0 bg-cover bg-center opacity-30 transition-opacity duration-1000 z-0"
-                style={{ backgroundImage: bgImage, filter: "blur(20px)" }}
+                className="absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-1000 z-0"
+                style={{ backgroundImage: bgImage, filter: "blur(20px) saturate(1.3)", transform: "scale(1.3)" }}
             >
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/40 to-transparent"></div>
             </div>
 
             {/* Left: Player Section */}

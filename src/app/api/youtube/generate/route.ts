@@ -1,6 +1,32 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+
+// === Type Definitions ===
+interface YouTubeSnippet {
+    title?: string;
+    thumbnails?: {
+        high?: { url?: string };
+        default?: { url?: string };
+    };
+}
+
+interface YouTubeSearchItem {
+    id?: { videoId?: string };
+    snippet?: YouTubeSnippet;
+}
+
+interface YouTubeSearchResponse {
+    items?: YouTubeSearchItem[];
+}
+
+interface CachedTrack {
+    id: string;
+    title: string;
+    artist: string;
+    thumbnailUrl: string;
+}
+
 
 // Estimate 4 mins per song on average to calculate track count
 const AVG_SONG_DURATION_MINUTES = 4;
@@ -24,7 +50,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 // === Dev Memory Cache Fallback ===
-const devMemoryCache = new Map<string, { data: any, exp: number }>();
+const devMemoryCache = new Map<string, { data: CachedTrack[], exp: number }>();
 
 // === Input Sanitization ===
 function sanitizeString(input: string): string {
@@ -58,16 +84,17 @@ function getApiKeys(): string[] {
 /**
  * YouTube APIにリクエストを送信。403/429エラー時は次のキーにフォールバック。
  */
-async function fetchYouTubeWithRotation(url: string, apiKeys: string[]): Promise<any> {
-    let lastError: any = null;
+async function fetchYouTubeWithRotation(url: string, apiKeys: string[]): Promise<AxiosResponse<YouTubeSearchResponse>> {
+    let lastError: Error | null = null;
     for (const key of apiKeys) {
         try {
             const fullUrl = `${url}&key=${key}`;
-            const response = await axios.get(fullUrl);
+            const response = await axios.get<YouTubeSearchResponse>(fullUrl);
             return response;
-        } catch (err: any) {
-            const status = err.response?.status;
-            lastError = err;
+        } catch (err: unknown) {
+            const axiosErr = err as { response?: { status?: number }; message?: string };
+            const status = axiosErr.response?.status;
+            lastError = err instanceof Error ? err : new Error(String(err));
             // 403 (Quota Exceeded / Forbidden) or 429 (Rate Limit) → try next key
             if (status === 403 || status === 429) {
                 console.warn(`API key exhausted (HTTP ${status}), trying next key...`);
@@ -108,19 +135,20 @@ export async function POST(req: Request) {
         }
 
         // --- Cache Layer Initialization ---
-        let cacheGet = async (key: string): Promise<any> => {
+        let cacheGet = async (key: string): Promise<CachedTrack[] | null> => {
             const item = devMemoryCache.get(key);
             if (item && item.exp > Date.now()) return item.data;
             return null;
         };
-        let cachePut = async (key: string, value: any): Promise<void> => {
+        let cachePut = async (key: string, value: CachedTrack[]): Promise<void> => {
             devMemoryCache.set(key, { data: value, exp: Date.now() + 2592000000 });
         };
 
         try {
             const { env } = getCloudflareContext();
-            if (env && (env as any).YOUTUBE_CACHE) {
-                const kv = (env as any).YOUTUBE_CACHE;
+            const cfEnv = env as Record<string, unknown>;
+            if (cfEnv?.YOUTUBE_CACHE) {
+                const kv = cfEnv.YOUTUBE_CACHE as { get: (key: string, type: string) => Promise<CachedTrack[] | null>; put: (key: string, value: string, opts: { expirationTtl: number }) => Promise<void> };
                 cacheGet = async (key) => await kv.get(key, 'json');
                 // Cache for 30 days (2592000 seconds)
                 cachePut = async (key, value) => await kv.put(key, JSON.stringify(value), { expirationTtl: 2592000 });
@@ -146,7 +174,7 @@ export async function POST(req: Request) {
             ? Math.min(Math.max(1, Number(trackCount)), 50)
             : Math.ceil(safeDuration / AVG_SONG_DURATION_MINUTES);
         const tracksPerArtist = Math.ceil(totalTracksTarget / artists.length);
-        let allTracks: any[] = [];
+        let allTracks: CachedTrack[] = [];
         let lastApiError: string | null = null;
 
         // Fetch popular tracks for each artist from YouTube
@@ -158,8 +186,8 @@ export async function POST(req: Request) {
 
                 // --- CACHE CHECK ---
                 const cacheKey = `artist_tracks_${encodeURIComponent(artistName.toLowerCase())}`;
-                let tracks: any[] = [];
-                let cachedTracks: any[] | null = null;
+                let tracks: CachedTrack[] = [];
+                let cachedTracks: CachedTrack[] | null = null;
 
                 try {
                     cachedTracks = await cacheGet(cacheKey);
@@ -180,12 +208,12 @@ export async function POST(req: Request) {
                         continue;
                     }
 
-                    tracks = items.map((item: any) => ({
+                    tracks = items.map((item: YouTubeSearchItem) => ({
                         id: item.id?.videoId || "",
                         title: sanitizeString(String(item.snippet?.title || "Unknown Title")),
                         artist: artistName,
                         thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || "",
-                    })).filter((t: any) => t.id); // Ensure we actually have an ID
+                    })).filter((t: CachedTrack) => t.id); // Ensure we actually have an ID
 
                     // --- CACHE SAVE ---
                     if (tracks.length > 0) {
@@ -199,9 +227,10 @@ export async function POST(req: Request) {
                 // Shuffle tracks and take the required amount
                 const shuffledTracks = tracks.sort(() => 0.5 - Math.random()).slice(0, tracksPerArtist);
                 allTracks = [...allTracks, ...shuffledTracks];
-            } catch (err: any) {
-                lastApiError = err.response?.data?.error?.message || err.message;
-                console.error(`Error fetching YouTube data for artist:`, err.response?.status || err.message);
+            } catch (err: unknown) {
+                const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
+                lastApiError = axiosErr.response?.data?.error?.message || axiosErr.message || 'Unknown error';
+                console.error(`Error fetching YouTube data for artist:`, axiosErr.response?.status || axiosErr.message);
                 // Continue to the next artist if one fails
             }
         }
@@ -224,8 +253,8 @@ export async function POST(req: Request) {
         const playlist = allTracks.sort(() => 0.5 - Math.random());
 
         return NextResponse.json({ playlist });
-    } catch (error: any) {
-        console.error('YouTube API Generic Error:', error.message);
+    } catch (error: unknown) {
+        console.error('YouTube API Generic Error:', error instanceof Error ? error.message : String(error));
         return NextResponse.json(
             { error: 'Failed to generate playlist.' },
             { status: 500 }

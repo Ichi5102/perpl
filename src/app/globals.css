@@ -6,9 +6,9 @@
   --accent: #9370db;
   --accent-secondary: #8a2be2;
   --accent-foreground: #ffffff;
-  --tile-bg: rgba(25, 25, 25, 0.5);
-  --tile-bg-hover: rgba(40, 40, 40, 0.65);
-  --tile-border: rgba(255, 255, 255, 0.05);
+  --tile-bg: rgba(40, 40, 40, 0.65);
+  --tile-bg-hover: rgba(60, 60, 60, 0.8);
+  --tile-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
@@ -36,10 +36,12 @@ body {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--tile-border);
   border-radius: 1.25rem;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 
   &:hover {
     background-color: var(--tile-bg-hover);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 }
 

@@ -168,7 +168,7 @@ export function PlaylistCreatorTile() {
             }
 
             // Create a clean array of tracks from the response
-            const playlist: Track[] = res.data.playlist.map((t: any) => ({
+            const playlist: Track[] = res.data.playlist.map((t: Record<string, unknown>) => ({
                 id: String(t.id || ""),
                 title: String(t.title || "Unknown Title"),
                 artist: String(t.artist || "Unknown Artist"),
@@ -193,9 +193,10 @@ export function PlaylistCreatorTile() {
             } else {
                 alert("Could not generate a playlist (No suitable tracks found). Try a different artist.");
             }
-        } catch (error: any) {
-            console.error("Failed to generate playlist:", error?.response?.data || error.message);
-            const errMsg = error?.response?.data?.error || "Failed to generate playlist. Check your API keys and try again.";
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { error?: string } }; message?: string };
+            console.error("Failed to generate playlist:", axiosErr?.response?.data || (error instanceof Error ? error.message : String(error)));
+            const errMsg = axiosErr?.response?.data?.error || "Failed to generate playlist. Check your API keys and try again.";
             alert(errMsg);
         } finally {
             setIsGenerating(false);
@@ -282,7 +283,7 @@ export function PlaylistCreatorTile() {
                                 {!inputValue.trim() && artistHistory.map((sugg, i) => (
                                     <button
                                         key={`ah-${i}`}
-                                        onClick={(e) => handleAddArtist(e as any, sugg)}
+                                        onClick={(e) => handleAddArtist(e as React.FormEvent, sugg)}
                                         className="w-full text-left px-4 py-2.5 text-sm text-gray-300 font-medium hover:bg-white/10 hover:text-white transition-colors flex items-center gap-3 border-b border-white/5 last:border-b-0"
                                     >
                                         <History className="w-3.5 h-3.5 text-gray-500" />
@@ -292,7 +293,7 @@ export function PlaylistCreatorTile() {
                                 {inputValue.trim() && suggestions.map((sugg, i) => (
                                     <button
                                         key={`su-${i}`}
-                                        onClick={(e) => handleAddArtist(e as any, sugg)}
+                                        onClick={(e) => handleAddArtist(e as React.FormEvent, sugg)}
                                         className="w-full text-left px-4 py-2.5 text-sm text-white font-medium hover:bg-white/10 transition-colors flex items-center gap-3 border-b border-white/5 last:border-b-0"
                                     >
                                         <Search className="w-3.5 h-3.5 text-gray-400" />

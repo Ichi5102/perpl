@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import type { YouTubePlayer } from 'react-youtube';
 
 // Format seconds into mm:ss
 const formatTime = (time: number) => {
@@ -9,7 +10,7 @@ const formatTime = (time: number) => {
 };
 
 interface ProgressBarProps {
-    player: any;
+    player: YouTubePlayer | null;
     isPlayerReady: boolean;
     isPlaying: boolean;
 }

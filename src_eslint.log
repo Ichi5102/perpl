@@ -1,0 +1,90 @@
+
+/home/ichi/vibe/perpl/src/__tests__/components/components.test.tsx
+  1:36  warning  'beforeEach' is defined but never used    @typescript-eslint/no-unused-vars
+  7:15  warning  'props' is defined but never used         @typescript-eslint/no-unused-vars
+  7:22  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/__tests__/integration/e2e-patterns.test.tsx
+    1:48  warning  'afterEach' is defined but never used           @typescript-eslint/no-unused-vars
+    3:8   warning  'userEvent' is defined but never used           @typescript-eslint/no-unused-vars
+   17:15  warning  'props' is defined but never used               @typescript-eslint/no-unused-vars
+   17:22  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   26:27  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   28:18  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   29:20  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   33:28  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+  165:17  warning  'container' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  188:15  warning  'res' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  358:25  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/app/api/itunes/search/route.ts
+  51:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  60:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/app/api/youtube/generate/route.ts
+   27:48  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+   40:7   warning  'MAX_ARTIST_NAME_LENGTH' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   61:82  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+   62:20  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+   68:23  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  111:53  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  116:51  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  122:32  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  123:36  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  128:18  warning  'e' is defined but never used                                @typescript-eslint/no-unused-vars
+  149:24  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  161:29  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  162:35  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  183:47  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  188:36  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  202:27  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+  227:21  error    Unexpected any. Specify a different type                     @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/components/dashboard/HistoryTile.tsx
+  40:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  45:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/components/dashboard/PlayerTile.tsx
+   31:42  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  102:30  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  117:22  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  176:80  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  199:8   warning  React Hook useEffect has a missing dependency: 'tr.unknownTitle'. Either include it or remove the dependency array                                                                                                                                                                       react-hooks/exhaustive-deps
+  306:46  warning  'err' is defined but never used                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  402:45  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/ichi/vibe/perpl/src/components/dashboard/PlaylistCreatorTile.tsx
+    4:43  warning  'Plus' is defined but never used          @typescript-eslint/no-unused-vars
+  171:65  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  196:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  285:78  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  295:78  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/ichi/vibe/perpl/src/components/dashboard/ProgressBar.tsx
+  12:13  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  36:26  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/ichi/vibe/perpl/src/components/dashboard/SettingsTile.tsx
+  22:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/ichi/vibe/perpl/src/components/dashboard/SettingsTile.tsx:22:9
+  20 |
+  21 |     useEffect(() => {
+> 22 |         setMounted(true);
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  23 |     }, []);
+  24 |
+  25 |     if (!mounted) return (  react-hooks/set-state-in-effect
+
+/home/ichi/vibe/perpl/src/middleware.ts
+  3:28  warning  'request' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 52 problems (35 errors, 17 warnings)
+

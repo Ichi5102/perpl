@@ -99,7 +99,7 @@ export function PlayerTile() {
                     try {
                         lastRequestedVideoIdRef.current = nextTrackItem.id;
                         event.target.loadVideoById(nextTrackItem.id);
-                    } catch (err) { }
+                    } catch { }
                 }
             }
 
@@ -114,7 +114,7 @@ export function PlayerTile() {
                 if (typeof event.target.playVideo === 'function') {
                     event.target.playVideo();
                 }
-            } catch (err) { }
+            } catch { }
         }
     };
 
@@ -303,7 +303,7 @@ export function PlayerTile() {
                                         } else {
                                             player.playVideo();
                                         }
-                                    } catch (err) { }
+                                    } catch { }
                                 }
                                 togglePlay();
                             }}

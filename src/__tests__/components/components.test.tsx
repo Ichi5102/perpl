@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 // Mock dependencies that are hard to render in test environment
 vi.mock('react-youtube', () => ({
     __esModule: true,
-    default: (props: any) => <div data-testid="youtube-player">YouTube Mock</div>,
+    default: () => <div data-testid="youtube-player">YouTube Mock</div>,
 }));
 
 vi.mock('@/components/effects/BrownianMotionCanvas', () => ({

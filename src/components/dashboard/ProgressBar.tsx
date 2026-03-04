@@ -33,7 +33,7 @@ export function ProgressBar({ player, isPlayerReady, isPlaying }: ProgressBarPro
                         setCurrentTime(current || 0);
                         setDuration(dur || 0);
                     }
-                } catch (e) {
+                } catch {
                     // ignore
                 }
             }, 500);

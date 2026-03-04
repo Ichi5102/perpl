@@ -31,7 +31,7 @@ function sanitizeString(input: string): string {
     return input
         .replace(/[<>'"&]/g, '') // Remove HTML-significant characters
         .trim()
-        .slice(0, 200); // Max 200 characters
+        .slice(0, MAX_ARTIST_NAME_LENGTH); // Max characters
 }
 
 // === Validation Constants ===
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
                 // Cache for 30 days (2592000 seconds)
                 cachePut = async (key, value) => await kv.put(key, JSON.stringify(value), { expirationTtl: 2592000 });
             }
-        } catch (e) {
+        } catch {
             // Not in Cloudflare environment, using fallback memory cache
         }
 
@@ -163,7 +163,7 @@ export async function POST(req: Request) {
 
                 try {
                     cachedTracks = await cacheGet(cacheKey);
-                } catch (e) { console.error('Cache get error:', e); }
+                } catch { console.error('Cache get error'); }
 
                 if (cachedTracks && Array.isArray(cachedTracks) && cachedTracks.length > 0) {
                     console.log(`[Cache HIT] Skipping YouTube API for artist: ${artistName}`);
@@ -192,7 +192,7 @@ export async function POST(req: Request) {
                         try {
                             await cachePut(cacheKey, tracks);
                             console.log(`[Cache SAVED] Saved YouTube results for artist: ${artistName}`);
-                        } catch (e) { console.error('Cache put error:', e); }
+                        } catch { console.error('Cache put error'); }
                     }
                 }
 

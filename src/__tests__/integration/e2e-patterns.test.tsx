@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 
 // ============================================================
 // E2E Integration Test: サイト操作パターン網羅テスト
@@ -14,7 +13,7 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('react-youtube', () => ({
     __esModule: true,
-    default: (props: any) => <div data-testid="youtube-player">YouTube Mock</div>,
+    default: () => <div data-testid="youtube-player">YouTube Mock</div>,
 }));
 
 vi.mock('@/components/effects/BrownianMotionCanvas', () => ({
@@ -162,7 +161,7 @@ describe('プレイリスト生成', () => {
 
         // Pre-populate with a selected artist by mocking the component state
         const { PlaylistCreatorTile } = await import('@/components/dashboard/PlaylistCreatorTile');
-        const { container } = render(<PlaylistCreatorTile />);
+        render(<PlaylistCreatorTile />);
 
         await waitFor(() => {
             expect(screen.getByText('Create Playlist')).toBeInTheDocument();
@@ -185,7 +184,7 @@ describe('プレイリスト生成', () => {
 
         // We can't easily simulate the full flow without selected artists,
         // but we verify the generate endpoint doesn't require apiKey
-        const res = await axios.post('/api/youtube/generate', {
+        await axios.post('/api/youtube/generate', {
             artists: [{ name: 'Test' }],
             durationMinutes: 30,
             // NO apiKey field!

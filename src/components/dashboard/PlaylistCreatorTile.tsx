@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Clock, Play, X, Loader2, Plus, ChevronUp, ChevronDown, History } from "lucide-react";
+import { Search, Clock, Play, X, Loader2, ChevronUp, ChevronDown, History } from "lucide-react";
 
 import { usePlayerStore, Track, ArtistInfo } from "@/store/usePlayerStore";
 import { useSettingsStore } from "@/store/useSettingsStore";

@@ -4,6 +4,37 @@ import axios from 'axios';
 // Estimate 4 mins per song on average to calculate track count
 const AVG_SONG_DURATION_MINUTES = 4;
 
+// === Rate Limiting ===
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10;   // max 10 requests per minute per IP
+const requestLog = new Map<string, { count: number; resetTime: number }>();
+
+function isRateLimited(ip: string): boolean {
+    const now = Date.now();
+    const entry = requestLog.get(ip);
+
+    if (!entry || now > entry.resetTime) {
+        requestLog.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+        return false;
+    }
+
+    entry.count++;
+    return entry.count > RATE_LIMIT_MAX_REQUESTS;
+}
+
+// === Input Sanitization ===
+function sanitizeString(input: string): string {
+    return input
+        .replace(/[<>'"&]/g, '') // Remove HTML-significant characters
+        .trim()
+        .slice(0, 200); // Max 200 characters
+}
+
+// === Validation Constants ===
+const MAX_DURATION_MINUTES = 120;
+const MAX_ARTISTS = 10;
+const MAX_ARTIST_NAME_LENGTH = 200;
+
 /**
  * 環境変数からAPIキーの配列を取得する。
  * YOUTUBE_API_KEYS (カンマ区切り) を優先し、なければ YOUTUBE_API_KEY を使用。
@@ -48,7 +79,20 @@ async function fetchYouTubeWithRotation(url: string, apiKeys: string[]): Promise
 
 export async function POST(req: Request) {
     try {
-        const { artists, durationMinutes, trackCount } = await req.json();
+        // --- Rate Limiting ---
+        const ip = req.headers.get('cf-connecting-ip')
+            || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || 'unknown';
+
+        if (isRateLimited(ip)) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please try again later.' },
+                { status: 429 }
+            );
+        }
+
+        const body = await req.json();
+        const { artists, durationMinutes, trackCount } = body;
         const apiKeys = getApiKeys();
 
         if (apiKeys.length === 0) {
@@ -59,7 +103,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
         }
 
-        const totalTracksTarget = trackCount ? trackCount : Math.ceil(durationMinutes / AVG_SONG_DURATION_MINUTES);
+        // --- Input Validation ---
+        if (!Array.isArray(artists) || artists.length > MAX_ARTISTS) {
+            return NextResponse.json(
+                { error: `Too many artists. Maximum is ${MAX_ARTISTS}.` },
+                { status: 400 }
+            );
+        }
+
+        const safeDuration = Math.min(
+            Math.max(1, Number(durationMinutes) || 30),
+            MAX_DURATION_MINUTES
+        );
+
+        const totalTracksTarget = trackCount
+            ? Math.min(Math.max(1, Number(trackCount)), 50)
+            : Math.ceil(safeDuration / AVG_SONG_DURATION_MINUTES);
         const tracksPerArtist = Math.ceil(totalTracksTarget / artists.length);
         let allTracks: any[] = [];
         let lastApiError: string | null = null;
@@ -67,20 +126,24 @@ export async function POST(req: Request) {
         // Fetch popular tracks for each artist from YouTube
         for (const artist of artists) {
             try {
-                const query = encodeURIComponent(`${artist.name} official music video`);
-                const baseUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${tracksPerArtist + 5}`;
+                // Sanitize artist name
+                const artistName = sanitizeString(String(artist.name || ''));
+                if (!artistName) continue;
+
+                const query = encodeURIComponent(`${artistName} official music video`);
+                const baseUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${Math.min(tracksPerArtist + 5, 25)}`;
                 const response = await fetchYouTubeWithRotation(baseUrl, apiKeys);
 
                 const items = response.data?.items || [];
                 if (items.length === 0) {
-                    console.log(`No videos found for artist: ${artist.name}`);
+                    console.log(`No videos found for artist: ${artistName}`);
                     continue;
                 }
 
                 const tracks = items.map((item: any) => ({
                     id: item.id?.videoId || "",
-                    title: item.snippet?.title || "Unknown Title",
-                    artist: artist.name,
+                    title: sanitizeString(String(item.snippet?.title || "Unknown Title")),
+                    artist: artistName,
                     thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || "",
                 })).filter((t: any) => t.id); // Ensure we actually have an ID
 
@@ -89,15 +152,16 @@ export async function POST(req: Request) {
                 allTracks = [...allTracks, ...shuffledTracks];
             } catch (err: any) {
                 lastApiError = err.response?.data?.error?.message || err.message;
-                console.error(`Error fetching YouTube data for ${artist.name}:`, err.response?.data || err.message);
+                console.error(`Error fetching YouTube data for artist:`, err.response?.status || err.message);
                 // Continue to the next artist if one fails
             }
         }
 
         if (allTracks.length === 0) {
             if (lastApiError) {
+                // Don't expose internal API error details
                 return NextResponse.json(
-                    { error: `YouTube API Error: ${lastApiError}` },
+                    { error: 'Failed to fetch videos. Please try again.' },
                     { status: 400 }
                 );
             }
@@ -114,7 +178,7 @@ export async function POST(req: Request) {
     } catch (error: any) {
         console.error('YouTube API Generic Error:', error.message);
         return NextResponse.json(
-            { error: 'Failed to generate playlist from YouTube' },
+            { error: 'Failed to generate playlist.' },
             { status: 500 }
         );
     }

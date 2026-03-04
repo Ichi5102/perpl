@@ -176,10 +176,11 @@ describe('/api/youtube/generate', () => {
             durationMinutes: 10,
         });
 
-        // All keys exhausted → error with quota message
+        // All keys exhausted → generic error (internal details hidden)
         expect(res.status).toBe(400);
         const data = await res.json();
-        expect(data.error).toContain('quotaExceeded');
+        expect(data.error).not.toContain('quotaExceeded'); // Internal error is hidden
+        expect(data.error).toBeTruthy();
     });
 
     it('should read YOUTUBE_API_KEYS (comma-separated) over YOUTUBE_API_KEY', async () => {

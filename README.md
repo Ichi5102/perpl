@@ -45,5 +45,5 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ~~youtubeAPI2つを自動入れ替え検証~~
 ~~セキュリティ検証~~
 マネタイズ検証
-軽量化
+~~軽量化~~
 ~~プレイリストマウスホバー時色~~

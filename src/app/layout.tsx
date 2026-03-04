@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter_Tight } from "next/font/google";
+import { Geist, Geist_Mono, Inter_Tight, DM_Sans } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,14 +13,33 @@ const geistMono = Geist_Mono({
 });
 
 const interTight = Inter_Tight({
-  weight: ["900"],
+  weight: ["200", "900"],
   subsets: ["latin"],
   variable: "--font-logo",
 });
 
+const dmSans = DM_Sans({
+  weight: ["200"],
+  subsets: ["latin"],
+  variable: "--font-logo-sub",
+});
+
 export const metadata: Metadata = {
-  title: "Perpl",
-  description: "Modern web streaming service blending YouTube and Spotify.",
+  title: "Perpl Music | Web Player",
+  description: "作業用BGM自動生成プレイヤー",
+  keywords: ["Perpl", "Perpl Music", "BGM", "作業用BGM", "プレイリスト", "lo-fi", "音楽プレイヤー"],
+  openGraph: {
+    title: "Perpl Music",
+    description: "Web Player",
+    siteName: "Perpl Music",
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Perpl Music",
+    description: "Web Player",
+  },
 };
 
 export default function RootLayout({
@@ -31,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${interTight.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${interTight.variable} ${dmSans.variable} antialiased`}
       >
         {children}
       </body>

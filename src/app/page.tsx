@@ -15,7 +15,7 @@ export default function Home() {
 
       {/* Header */}
       <header className="w-full relative z-10 flex justify-start items-end pb-4 pt-6 pl-6 md:pl-28 pr-4 md:pr-8">
-        <h1 className="text-4xl md:text-7xl font-thin tracking-[0.15em] text-[#9370db] leading-none" style={{ fontFamily: "var(--font-logo), sans-serif" }}>
+        <h1 className="text-4xl md:text-7xl font-black tracking-tight text-[#9370db] leading-none" style={{ fontFamily: "var(--font-logo), sans-serif" }}>
           Perpl
         </h1>
       </header>

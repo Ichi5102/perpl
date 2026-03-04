@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, ListMusic, MoreVertical, Volume2, VolumeX, Infinity, Trash2, Shuffle, Menu, History } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, ListMusic, Infinity, Trash2, Shuffle, Menu } from "lucide-react";
 import YouTube, { YouTubeProps } from "react-youtube";
 import axios from "axios";
-import { usePlayerStore, Track, PlaylistHistoryItem } from "@/store/usePlayerStore";
+import { usePlayerStore, Track } from "@/store/usePlayerStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { getTranslations } from "@/i18n";
+import { ProgressBar } from "./ProgressBar";
 
 export function PlayerTile() {
     const {
@@ -20,9 +21,6 @@ export function PlayerTile() {
         prevTrack,
         clearQueue,
         shuffleQueue,
-        playlistHistory,
-        setCurrentTrack,
-        setQueue,
         triggerCreatorReset,
         skipToTrack
     } = usePlayerStore();
@@ -33,11 +31,6 @@ export function PlayerTile() {
     const [player, setPlayer] = useState<any>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    // Progress bar state
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [isSeeking, setIsSeeking] = useState(false);
 
     // Infinite fetching state
     const [isFetchingInfinite, setIsFetchingInfinite] = useState(false);
@@ -109,35 +102,6 @@ export function PlayerTile() {
                     event.target.playVideo();
                 }
             } catch (err) { }
-        }
-    };
-
-    // Progress bar polling
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (isPlaying && player && isPlayerReady && !isSeeking) {
-            interval = setInterval(async () => {
-                try {
-                    if (typeof player.getCurrentTime === 'function') {
-                        const current = await player.getCurrentTime();
-                        const dur = await player.getDuration();
-                        setCurrentTime(current || 0);
-                        setDuration(dur || 0);
-                    }
-                } catch (e) {
-                    // ignore
-                }
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isPlaying, player, isPlayerReady, isSeeking]);
-
-    // Handle seeking
-    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const time = parseFloat(e.target.value);
-        setCurrentTime(time);
-        if (player && typeof player.seekTo === 'function') {
-            player.seekTo(time, true);
         }
     };
 
@@ -261,12 +225,14 @@ export function PlayerTile() {
     const bgImage = currentTrack?.thumbnailUrl ? `url("${currentTrack.thumbnailUrl}")` : 'none';
 
     return (
-        <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6">
-            {/* Background with strong blur (simulated thumbnail from current track) */}
+        <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6 bg-black/80">
+            {/* Lightweight Background Overlay */}
             <div
-                className="absolute inset-0 bg-cover bg-center opacity-40 blur-3xl saturate-[2] brightness-125 z-0 transition-all duration-1000 bg-black mix-blend-screen"
-                style={{ backgroundImage: bgImage }}
-            ></div>
+                className="absolute inset-0 bg-cover bg-center opacity-30 transition-opacity duration-1000 z-0"
+                style={{ backgroundImage: bgImage, filter: "blur(20px)" }}
+            >
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+            </div>
 
             {/* Left: Player Section */}
             <div className="relative z-10 flex flex-col h-full flex-1 md:border-r border-white/10 md:pr-6">
@@ -302,38 +268,7 @@ export function PlayerTile() {
 
                 {/* Controls */}
                 <div className="flex flex-col items-center justify-center mt-auto pb-4 gap-4 w-full">
-                    {/* Progress Bar */}
-                    {currentTrack && (
-                        <div className="w-full max-w-[90%] flex items-center gap-3 text-[10px] text-gray-400 font-mono mt-2">
-                            <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
-                            <div className="relative flex-1 h-3 group/slider cursor-pointer flex items-center">
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max={duration || 100}
-                                    value={currentTime}
-                                    onChange={handleSeek}
-                                    onMouseDown={() => setIsSeeking(true)}
-                                    onMouseUp={() => setIsSeeking(false)}
-                                    onTouchStart={() => setIsSeeking(true)}
-                                    onTouchEnd={() => setIsSeeking(false)}
-                                    className="absolute w-full h-full opacity-0 cursor-pointer z-20"
-                                />
-                                <div className="w-full h-1 bg-white/30 rounded-full relative">
-                                    <div
-                                        className="h-full bg-accent group-hover/slider:bg-accent-foreground transition-colors rounded-full"
-                                        style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-                                    />
-                                    {/* Circular Thumb */}
-                                    <div
-                                        className="w-3 h-3 bg-white rounded-full absolute top-1/2 -translate-y-1/2 -translate-x-1.5 shadow-sm pointer-events-none transition-transform group-hover/slider:scale-125"
-                                        style={{ left: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-                                    ></div>
-                                </div>
-                            </div>
-                            <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
-                        </div>
-                    )}
+                    <ProgressBar player={player} isPlayerReady={isPlayerReady} isPlaying={isPlaying} />
 
                     <div className="flex flex-col items-center gap-1 text-center max-w-[90%]">
                         <h3 className="text-white font-semibold text-lg drop-shadow-md line-clamp-1 w-full" title={currentTrack?.title || tr.playerFallbackTitle}>

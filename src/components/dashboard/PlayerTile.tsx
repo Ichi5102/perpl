@@ -39,6 +39,10 @@ export function PlayerTile() {
     // polluting the store while we are programmatically loading a new video.
     const isTransitioningRef = useRef(false);
 
+    // Store the ID of the last video we explicitly asked YouTube to load
+    // This prevents React's useEffect from double-calling loadVideoById in background tabs
+    const lastRequestedVideoIdRef = useRef<string | null>(null);
+
     // Keep volume in sync with store
     useEffect(() => {
         if (player && isPlayerReady) {
@@ -63,6 +67,7 @@ export function PlayerTile() {
             // Auto-play on page load / reload
             if (currentTrack?.id && typeof event.target.loadVideoById === 'function') {
                 isTransitioningRef.current = true;
+                lastRequestedVideoIdRef.current = currentTrack.id;
                 event.target.loadVideoById(currentTrack.id);
             }
         } catch (err) {
@@ -84,14 +89,22 @@ export function PlayerTile() {
         } else if (event.data === 0) {
             // Track ended
             isTransitioningRef.current = true;
-            nextTrack();
-            // SYNCHRONOUSLY load next track to preserve background media session in Chrome
+
+            // Peek at next track and SYNCHRONOUSLY load it BEFORE updating Zustand.
+            // This is crucial for surviving background tab throttling in modern browsers.
             const storeState = usePlayerStore.getState();
-            if (storeState.currentTrack && event.target && typeof event.target.loadVideoById === 'function') {
-                try {
-                    event.target.loadVideoById(storeState.currentTrack.id);
-                } catch (err) { }
+            if (storeState.queue.length > 0) {
+                const nextTrackItem = storeState.queue[0];
+                if (event.target && typeof event.target.loadVideoById === 'function') {
+                    try {
+                        lastRequestedVideoIdRef.current = nextTrackItem.id;
+                        event.target.loadVideoById(nextTrackItem.id);
+                    } catch (err) { }
+                }
             }
+
+            // Now update the store (this may be delayed in a background tab, but media is already playing)
+            nextTrack();
         } else if (event.data === 5) {
             // Video cued — attempt to play (may fail due to autoplay policy)
             // Do NOT call play() here. Let playing(1) handle the store sync.
@@ -111,15 +124,10 @@ export function PlayerTile() {
             try {
                 // Sync Track ID
                 if (currentTrack?.id) {
-                    const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
-                    const playingId = videoData?.video_id;
-                    if (playingId && playingId !== currentTrack.id) {
+                    // Only load if we haven't already requested this ID to load
+                    if (currentTrack.id !== lastRequestedVideoIdRef.current) {
                         isTransitioningRef.current = true;
-                        if (typeof player.loadVideoById === 'function') {
-                            player.loadVideoById(currentTrack.id);
-                        }
-                    } else if (!playingId) {
-                        isTransitioningRef.current = true;
+                        lastRequestedVideoIdRef.current = currentTrack.id;
                         if (typeof player.loadVideoById === 'function') {
                             player.loadVideoById(currentTrack.id);
                         }

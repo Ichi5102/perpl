@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Clock, Play, X, Loader2, Plus, ChevronUp, ChevronDown, History } from "lucide-react";
 
 import { usePlayerStore, Track, ArtistInfo } from "@/store/usePlayerStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
+import { getTranslations } from "@/i18n";
 import axios from "axios";
 import { BrownianMotionCanvas } from "@/components/effects/BrownianMotionCanvas";
 
@@ -34,6 +36,8 @@ const getRandomColor = () => {
 export function PlaylistCreatorTile() {
 
     const { setQueue, setCurrentTrack, currentTrack, queue, isInfinite, addTracksToQueue, addArtistHistory, clearArtistHistory, addPlaylistHistory, artistHistory, resetCreatorTrigger } = usePlayerStore();
+    const { locale } = useSettingsStore();
+    const t = getTranslations(locale);
 
     const [inputValue, setInputValue] = useState("");
     const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
@@ -144,7 +148,7 @@ export function PlaylistCreatorTile() {
         if (selectedArtists.length === 0 || isInfinite) return;
 
         if (!isAddMode && (currentTrack || queue.length > 0)) {
-            if (!window.confirm("現在のプレイリストが削除されます。よろしいですか？")) {
+            if (!window.confirm(t.confirmReplace)) {
                 return;
             }
         }
@@ -217,7 +221,7 @@ export function PlaylistCreatorTile() {
             ></div>
 
             <h2 className="text-xl font-bold text-accent-foreground mb-4 relative z-10 flex items-center justify-between">
-                Create Playlist
+                {t.createPlaylist}
 
             </h2>
 
@@ -248,7 +252,7 @@ export function PlaylistCreatorTile() {
                         )}
                         <input
                             type="text"
-                            placeholder={"Type artist name & press Enter..."}
+                            placeholder={t.artistInputPlaceholder}
                             value={inputValue}
                             onChange={(e) => {
                                 setInputValue(e.target.value);
@@ -303,7 +307,7 @@ export function PlaylistCreatorTile() {
                 {/* Selected Tags */}
                 <div className="flex flex-wrap gap-2 min-h-[30px] items-center">
                     {selectedArtists.length === 0 && (
-                        <span className="text-xs text-gray-600 italic">No artists selected</span>
+                        <span className="text-xs text-gray-600 italic">{t.noArtistsSelected}</span>
                     )}
                     {selectedArtists.map(artist => (
                         <span
@@ -329,14 +333,14 @@ export function PlaylistCreatorTile() {
                         disabled={isGenerating}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isAddMode ? 'bg-white/10 text-[#8fd3ff] shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'} disabled:opacity-50`}
                     >
-                        Replace
+                        {t.modeReplace}
                     </button>
                     <button
                         onClick={() => setIsAddMode(true)}
                         disabled={isGenerating}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isAddMode ? 'bg-white/10 text-[#d8b4fe] shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'} disabled:opacity-50`}
                     >
-                        Add
+                        {t.modeAdd}
                     </button>
                 </div>
 
@@ -350,11 +354,11 @@ export function PlaylistCreatorTile() {
                         <div className="flex items-center">
                             <Clock className="w-4 h-4 text-gray-400 mr-3 shrink-0" />
                             <span className="text-sm text-white font-medium">
-                                {duration === "30" && "30 Minutes"}
-                                {duration === "60" && "1 Hour"}
-                                {duration === "90" && "1.5 Hours"}
-                                {duration === "120" && "2 Hours"}
-                                {duration === "infinite" && "Infinite"}
+                                {duration === "30" && t.duration30min}
+                                {duration === "60" && t.duration1h}
+                                {duration === "90" && t.duration1_5h}
+                                {duration === "120" && t.duration2h}
+                                {duration === "infinite" && t.durationInfinite}
                             </span>
                         </div>
                         {isDurationMenuOpen ? (
@@ -368,11 +372,11 @@ export function PlaylistCreatorTile() {
                     {isDurationMenuOpen && (
                         <div className="absolute bottom-full left-0 w-full bg-black/90 border border-white/10 rounded-xl shadow-2xl py-2 z-30 backdrop-blur-xl mb-2">
                             {[
-                                { value: "30", label: "30 Minutes" },
-                                { value: "60", label: "1 Hour" },
-                                { value: "90", label: "1.5 Hours" },
-                                { value: "120", label: "2 Hours" },
-                                { value: "infinite", label: "Infinite" },
+                                { value: "30", label: t.duration30min },
+                                { value: "60", label: t.duration1h },
+                                { value: "90", label: t.duration1_5h },
+                                { value: "120", label: t.duration2h },
+                                { value: "infinite", label: t.durationInfinite },
                             ].map((option) => (
                                 <button
                                     key={option.value}
@@ -404,7 +408,7 @@ export function PlaylistCreatorTile() {
                     ) : (
                         <Play className="w-4 h-4 fill-current" />
                     )}
-                    {isInfinite ? "Infinite Active" : (isGenerating ? "Generating..." : "Play")}
+                    {isInfinite ? t.durationInfinite : (isGenerating ? t.generating : t.play)}
                 </button>
             </div>
         </div>

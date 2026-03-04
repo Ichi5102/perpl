@@ -3,14 +3,17 @@
 import { useState, useEffect } from "react";
 import { History, Play, Clock, Loader2 } from "lucide-react";
 import { usePlayerStore, PlaylistHistoryItem } from "@/store/usePlayerStore";
-
+import { useSettingsStore } from "@/store/useSettingsStore";
+import { getTranslations } from "@/i18n";
 import axios from "axios";
 
 export function HistoryTile() {
     const { playlistHistory, setQueue, setCurrentTrack, triggerCreatorReset } = usePlayerStore();
 
-    const [isGenerating, setIsGenerating] = useState<string | null>(null); // Store ID of history item being generated
+    const [isGenerating, setIsGenerating] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
+    const { locale } = useSettingsStore();
+    const t = getTranslations(locale);
 
     useEffect(() => setMounted(true), []);
 
@@ -34,12 +37,12 @@ export function HistoryTile() {
                 throw new Error("Invalid response from server");
             }
 
-            const playlist = res.data.playlist.map((t: any) => ({
-                id: String(t.id || ""),
-                title: String(t.title || "Unknown Title"),
-                artist: String(t.artist || "Unknown Artist"),
-                thumbnailUrl: String(t.thumbnailUrl || ""),
-            })).filter((t: any) => t.id);
+            const playlist = res.data.playlist.map((track: any) => ({
+                id: String(track.id || ""),
+                title: String(track.title || "Unknown Title"),
+                artist: String(track.artist || "Unknown Artist"),
+                thumbnailUrl: String(track.thumbnailUrl || ""),
+            })).filter((track: any) => track.id);
 
             if (playlist.length > 0) {
                 setCurrentTrack(playlist[0]);
@@ -67,7 +70,7 @@ export function HistoryTile() {
         <div className="glass-tile w-full h-full p-6 flex flex-col relative group hover:border-white/20 transition-all duration-300">
             <h2 className="text-xl font-bold text-accent-foreground mb-4 flex items-center gap-2">
                 <History className="w-5 h-5" />
-                History
+                {t.history}
             </h2>
 
             <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
@@ -89,10 +92,10 @@ export function HistoryTile() {
                                 <div className="flex items-center gap-2 text-xs text-gray-400 font-mono">
                                     <span className="flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
-                                        {item.duration === 'infinite' ? 'Inf' : `${item.duration}m`}
+                                        {item.duration === 'infinite' ? t.inf : `${item.duration}${t.minuteShort}`}
                                     </span>
                                     <span>•</span>
-                                    <span>{new Date(item.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span>{new Date(item.timestamp).toLocaleString(locale === 'ja' ? 'ja-JP' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
                             </div>
                             <button
@@ -111,7 +114,7 @@ export function HistoryTile() {
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-gray-500 py-10 opacity-50">
                         <History className="w-10 h-10 mb-3" />
-                        <p className="text-sm">No History</p>
+                        <p className="text-sm">{t.noHistory}</p>
                     </div>
                 )}
             </div>

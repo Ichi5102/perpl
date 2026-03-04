@@ -132,4 +132,101 @@ describe('/api/youtube/generate', () => {
 
         expect(res.status).toBe(404);
     });
+
+    it('should fallback to second key when first key returns 403', async () => {
+        process.env.YOUTUBE_API_KEYS = 'key-exhausted,key-working';
+        delete process.env.YOUTUBE_API_KEY;
+
+        const mockSuccess = {
+            data: {
+                items: [{
+                    id: { videoId: 'vid1' },
+                    snippet: { title: 'Song', thumbnails: { default: { url: 'http://img.jpg' } } },
+                }],
+            },
+        };
+
+        vi.mocked(axios.get)
+            .mockRejectedValueOnce({ response: { status: 403, data: { error: { message: 'quotaExceeded' } } } })
+            .mockResolvedValueOnce(mockSuccess);
+
+        const res = await callRoute({
+            artists: [{ name: 'Artist' }],
+            durationMinutes: 10,
+        });
+
+        expect(res.status).toBe(200);
+        // First call used exhausted key, second call used working key
+        expect(vi.mocked(axios.get)).toHaveBeenCalledTimes(2);
+        const firstUrl = vi.mocked(axios.get).mock.calls[0][0];
+        const secondUrl = vi.mocked(axios.get).mock.calls[1][0];
+        expect(firstUrl).toContain('key=key-exhausted');
+        expect(secondUrl).toContain('key=key-working');
+    });
+
+    it('should return error when ALL keys are exhausted (403)', async () => {
+        process.env.YOUTUBE_API_KEYS = 'key1-dead,key2-dead';
+        delete process.env.YOUTUBE_API_KEY;
+
+        vi.mocked(axios.get)
+            .mockRejectedValue({ response: { status: 403, data: { error: { message: 'quotaExceeded' } } } });
+
+        const res = await callRoute({
+            artists: [{ name: 'Artist' }],
+            durationMinutes: 10,
+        });
+
+        // All keys exhausted → error with quota message
+        expect(res.status).toBe(400);
+        const data = await res.json();
+        expect(data.error).toContain('quotaExceeded');
+    });
+
+    it('should read YOUTUBE_API_KEYS (comma-separated) over YOUTUBE_API_KEY', async () => {
+        process.env.YOUTUBE_API_KEYS = 'primary-key,secondary-key';
+        process.env.YOUTUBE_API_KEY = 'old-single-key'; // should be ignored
+
+        vi.mocked(axios.get).mockResolvedValue({
+            data: {
+                items: [{
+                    id: { videoId: 'vid1' },
+                    snippet: { title: 'Song', thumbnails: { default: { url: '' } } },
+                }],
+            },
+        });
+
+        const res = await callRoute({
+            artists: [{ name: 'Test' }],
+            durationMinutes: 10,
+        });
+
+        expect(res.status).toBe(200);
+        const calledUrl = vi.mocked(axios.get).mock.calls[0][0];
+        expect(calledUrl).toContain('key=primary-key');
+        expect(calledUrl).not.toContain('old-single-key');
+    });
+
+    it('should handle 429 rate limit by trying next key', async () => {
+        process.env.YOUTUBE_API_KEYS = 'rate-limited-key,backup-key';
+        delete process.env.YOUTUBE_API_KEY;
+
+        vi.mocked(axios.get)
+            .mockRejectedValueOnce({ response: { status: 429, data: {} } })
+            .mockResolvedValueOnce({
+                data: {
+                    items: [{
+                        id: { videoId: 'v1' },
+                        snippet: { title: 'Song', thumbnails: { default: { url: '' } } },
+                    }],
+                },
+            });
+
+        const res = await callRoute({
+            artists: [{ name: 'Artist' }],
+            durationMinutes: 10,
+        });
+
+        expect(res.status).toBe(200);
+        expect(vi.mocked(axios.get)).toHaveBeenCalledTimes(2);
+    });
 });

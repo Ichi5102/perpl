@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+2025/03/04 アップデート予定
+ロゴデザイン刷新、gitプッシュと再デプロイ実験
+携帯デバイスでの表示最適化
+PCのウィンドウ変形に対する最適化
+ダークモード、ライトモード実装
+日本語、英語切り替え設定実装
+youtubeAPI2つを自動入れ替え検証
+セキュリティ検証
+マネタイズ検証
+軽量化

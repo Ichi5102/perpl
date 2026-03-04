@@ -4,12 +4,54 @@ import axios from 'axios';
 // Estimate 4 mins per song on average to calculate track count
 const AVG_SONG_DURATION_MINUTES = 4;
 
+/**
+ * 環境変数からAPIキーの配列を取得する。
+ * YOUTUBE_API_KEYS (カンマ区切り) を優先し、なければ YOUTUBE_API_KEY を使用。
+ */
+function getApiKeys(): string[] {
+    const keysStr = process.env.YOUTUBE_API_KEYS;
+    if (keysStr) {
+        return keysStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    }
+    const singleKey = process.env.YOUTUBE_API_KEY;
+    if (singleKey) {
+        return [singleKey.trim()];
+    }
+    return [];
+}
+
+/**
+ * YouTube APIにリクエストを送信。403/429エラー時は次のキーにフォールバック。
+ */
+async function fetchYouTubeWithRotation(url: string, apiKeys: string[]): Promise<any> {
+    let lastError: any = null;
+    for (const key of apiKeys) {
+        try {
+            const fullUrl = `${url}&key=${key}`;
+            const response = await axios.get(fullUrl);
+            return response;
+        } catch (err: any) {
+            const status = err.response?.status;
+            lastError = err;
+            // 403 (Quota Exceeded / Forbidden) or 429 (Rate Limit) → try next key
+            if (status === 403 || status === 429) {
+                console.warn(`API key exhausted (HTTP ${status}), trying next key...`);
+                continue;
+            }
+            // Other errors → throw immediately, no point retrying with another key
+            throw err;
+        }
+    }
+    // All keys exhausted
+    throw lastError;
+}
+
 export async function POST(req: Request) {
     try {
         const { artists, durationMinutes, trackCount } = await req.json();
-        const apiKey = process.env.YOUTUBE_API_KEY;
+        const apiKeys = getApiKeys();
 
-        if (!apiKey) {
+        if (apiKeys.length === 0) {
             return NextResponse.json({ error: 'YouTube API Key is not configured on the server.' }, { status: 500 });
         }
 
@@ -26,9 +68,8 @@ export async function POST(req: Request) {
         for (const artist of artists) {
             try {
                 const query = encodeURIComponent(`${artist.name} official music video`);
-                const response = await axios.get(
-                    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${tracksPerArtist + 5}&key=${apiKey}`
-                );
+                const baseUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=${tracksPerArtist + 5}`;
+                const response = await fetchYouTubeWithRotation(baseUrl, apiKeys);
 
                 const items = response.data?.items || [];
                 if (items.length === 0) {

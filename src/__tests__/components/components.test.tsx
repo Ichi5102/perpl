@@ -14,6 +14,9 @@ vi.mock('@/components/effects/BrownianMotionCanvas', () => ({
 vi.mock('@/store/useSettingsStore', () => ({
     useSettingsStore: () => ({
         volume: 50,
+        locale: 'en',
+        setVolume: vi.fn(),
+        setLocale: vi.fn(),
     }),
 }));
 
@@ -90,7 +93,7 @@ describe('PlaylistCreatorTile', () => {
         expect(screen.queryByText('YouTube API Key Missing')).not.toBeInTheDocument();
 
         // Input should be enabled (not disabled due to missing API key)
-        const input = screen.getByPlaceholderText('Type artist name & press Enter...');
+        const input = screen.getByPlaceholderText('Type artist name...');
         expect(input).not.toBeDisabled();
     });
 });

@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, Volume2 } from "lucide-react";
+import { Settings, Volume2, Globe } from "lucide-react";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { getTranslations } from "@/i18n";
 
 export function SettingsTile() {
     const {
         volume,
+        locale,
         setVolume,
+        setLocale,
     } = useSettingsStore();
+
+    const t = getTranslations(locale);
 
     // Local state to prevent hydration mismatch with Zustand persist
     const [mounted, setMounted] = useState(false);
@@ -27,7 +32,7 @@ export function SettingsTile() {
         <div className="glass-tile w-full h-full lg:col-span-2 row-span-1 p-6 flex flex-col relative group hover:border-accent/50 transition-colors duration-300 overflow-y-auto custom-scrollbar" style={{ scrollbarWidth: "thin", scrollbarColor: "var(--accent) transparent" }}>
             <h2 className="text-xl font-bold text-accent-foreground mb-4 flex items-center gap-2">
                 <Settings className="w-5 h-5 opacity-70" />
-                Settings
+                {t.settings}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pb-2">
@@ -35,7 +40,7 @@ export function SettingsTile() {
                 <div className="flex flex-col space-y-2">
                     <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
                         <Volume2 className="w-4 h-4 text-accent" />
-                        Volume
+                        {t.volume}
                     </label>
                     <div className="flex items-center gap-4 bg-black/40 p-3 rounded-xl border border-white/5">
                         <div className="relative flex-1 h-3 group/slider cursor-pointer flex items-center">
@@ -63,11 +68,31 @@ export function SettingsTile() {
                     </div>
                 </div>
 
-
+                {/* Language Toggle */}
+                <div className="flex flex-col space-y-2">
+                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-accent" />
+                        {t.language}
+                    </label>
+                    <div className="flex bg-black/40 rounded-xl p-1 border border-white/5">
+                        <button
+                            onClick={() => setLocale('en')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${locale === 'en' ? 'bg-white/10 text-accent-foreground shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        >
+                            EN
+                        </button>
+                        <button
+                            onClick={() => setLocale('ja')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${locale === 'ja' ? 'bg-white/10 text-accent-foreground shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        >
+                            JA
+                        </button>
+                    </div>
+                </div>
 
                 {/* Debug / Reset */}
                 <div className="flex flex-col space-y-2 md:col-span-2 mt-2 pt-4 border-t border-white/5">
-                    <label className="text-xs font-medium text-gray-400">Troubleshooting</label>
+                    <label className="text-xs font-medium text-gray-400">{t.advanced}</label>
                     <button
                         onClick={() => {
                             localStorage.removeItem('perpl-player-storage');
@@ -75,10 +100,11 @@ export function SettingsTile() {
                         }}
                         className="w-full sm:w-auto px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-medium rounded-lg border border-red-500/20 transition-colors flex items-center justify-center"
                     >
-                        Clear Player State (Fix Crash)
+                        {t.clearPlayerState}
                     </button>
                 </div>
             </div>
         </div>
     );
 }
+

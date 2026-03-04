@@ -6,6 +6,7 @@ import YouTube, { YouTubeProps } from "react-youtube";
 import axios from "axios";
 import { usePlayerStore, Track, PlaylistHistoryItem } from "@/store/usePlayerStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { getTranslations } from "@/i18n";
 
 export function PlayerTile() {
     const {
@@ -22,10 +23,12 @@ export function PlayerTile() {
         playlistHistory,
         setCurrentTrack,
         setQueue,
-        triggerCreatorReset
+        triggerCreatorReset,
+        skipToTrack
     } = usePlayerStore();
 
-    const { volume } = useSettingsStore();
+    const { volume, locale } = useSettingsStore();
+    const tr = getTranslations(locale);
 
     const [player, setPlayer] = useState<any>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -38,6 +41,10 @@ export function PlayerTile() {
 
     // Infinite fetching state
     const [isFetchingInfinite, setIsFetchingInfinite] = useState(false);
+
+    // Guard: prevents YouTube's internal paused(2) events from
+    // polluting the store while we are programmatically loading a new video.
+    const isTransitioningRef = useRef(false);
 
     // Keep volume in sync with store
     useEffect(() => {
@@ -60,11 +67,10 @@ export function PlayerTile() {
             if (typeof event.target.setVolume === 'function') {
                 event.target.setVolume(volume);
             }
-            // Manually load initial video
+            // Auto-play on page load / reload
             if (currentTrack?.id && typeof event.target.loadVideoById === 'function') {
+                isTransitioningRef.current = true;
                 event.target.loadVideoById(currentTrack.id);
-            } else if (isPlaying && typeof event.target.playVideo === 'function') {
-                event.target.playVideo();
             }
         } catch (err) {
             console.warn("YouTube player onReady init error:", err);
@@ -73,11 +79,18 @@ export function PlayerTile() {
 
     const onStateChange: YouTubeProps['onStateChange'] = (event) => {
         // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
-        if (event.data === 1 && !isPlaying) {
-            play();
-        } else if (event.data === 2 && isPlaying) {
-            pause();
+        if (event.data === 1) {
+            // Video started playing — transition complete, sync store
+            isTransitioningRef.current = false;
+            if (!isPlaying) play();
+        } else if (event.data === 2) {
+            // Only sync user-initiated pause (not YouTube's internal pause during loading)
+            if (!isTransitioningRef.current && isPlaying) {
+                pause();
+            }
         } else if (event.data === 0) {
+            // Track ended
+            isTransitioningRef.current = true;
             nextTrack();
             // SYNCHRONOUSLY load next track to preserve background media session in Chrome
             const storeState = usePlayerStore.getState();
@@ -86,8 +99,11 @@ export function PlayerTile() {
                     event.target.loadVideoById(storeState.currentTrack.id);
                 } catch (err) { }
             }
-        } else if (event.data === 5 && isPlaying) {
-            // Force play when video enters "cued" state
+        } else if (event.data === 5) {
+            // Video cued — attempt to play (may fail due to autoplay policy)
+            // Do NOT call play() here. Let playing(1) handle the store sync.
+            // Otherwise, if autoplay is blocked, the UI shows "playing" while video is paused.
+            isTransitioningRef.current = false;
             try {
                 if (typeof event.target.playVideo === 'function') {
                     event.target.playVideo();
@@ -125,7 +141,7 @@ export function PlayerTile() {
         }
     };
 
-    // Keep iframe state in sync with Zustand natively
+    // Keep iframe state in sync with Zustand
     useEffect(() => {
         if (player && isPlayerReady) {
             try {
@@ -134,21 +150,25 @@ export function PlayerTile() {
                     const videoData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
                     const playingId = videoData?.video_id;
                     if (playingId && playingId !== currentTrack.id) {
+                        isTransitioningRef.current = true;
                         if (typeof player.loadVideoById === 'function') {
                             player.loadVideoById(currentTrack.id);
                         }
                     } else if (!playingId) {
+                        isTransitioningRef.current = true;
                         if (typeof player.loadVideoById === 'function') {
                             player.loadVideoById(currentTrack.id);
                         }
                     }
                 }
 
-                // Sync Play/Pause
-                if (isPlaying && typeof player.playVideo === 'function') {
-                    player.playVideo();
-                } else if (!isPlaying && typeof player.pauseVideo === 'function') {
-                    player.pauseVideo();
+                // Sync Play/Pause (only if not transitioning)
+                if (!isTransitioningRef.current) {
+                    if (isPlaying && typeof player.playVideo === 'function') {
+                        player.playVideo();
+                    } else if (!isPlaying && typeof player.pauseVideo === 'function') {
+                        player.pauseVideo();
+                    }
                 }
             } catch (err) {
                 console.warn("YouTube Player Sync Error:", err);
@@ -183,7 +203,7 @@ export function PlayerTile() {
 
                     const potentialTracks: Track[] = res.data.playlist.map((t: any) => ({
                         id: String(t.id || ""),
-                        title: String(t.title || "Unknown Title"),
+                        title: String(t.title || tr.unknownTitle),
                         artist: String(t.artist || "Unknown Artist"),
                         thumbnailUrl: String(t.thumbnailUrl || ""),
                         durationString: t.durationString ? String(t.durationString) : undefined
@@ -251,7 +271,7 @@ export function PlayerTile() {
             {/* Left: Player Section */}
             <div className="relative z-10 flex flex-col h-full flex-1 md:border-r border-white/10 md:pr-6">
                 <h2 className="text-xl font-bold text-white mb-auto drop-shadow-sm flex items-center justify-between">
-                    Player
+                    {tr.player}
                 </h2>
 
                 {/* Video Area */}
@@ -261,6 +281,7 @@ export function PlayerTile() {
                             <div className="w-full h-full pointer-events-none opacity-80 z-10 relative">
                                 {mounted && (
                                     <YouTube
+                                        videoId={currentTrack?.id || ''}
                                         opts={opts}
                                         onReady={onReady}
                                         onStateChange={onStateChange}
@@ -271,7 +292,7 @@ export function PlayerTile() {
                                 )}
                             </div>
                         ) : (
-                            <span className="text-white/40 text-sm font-medium tracking-wide">No Track Selected</span>
+                            <span className="text-white/40 text-sm font-medium tracking-wide">{tr.noTrackSelected}</span>
                         )}
 
                         {/* Overlay to catch clicks and prevent pausing from iframe */}
@@ -315,8 +336,8 @@ export function PlayerTile() {
                     )}
 
                     <div className="flex flex-col items-center gap-1 text-center max-w-[90%]">
-                        <h3 className="text-white font-semibold text-lg drop-shadow-md line-clamp-1 w-full" title={currentTrack?.title || "Perpl Player"}>
-                            {currentTrack?.title || "Perpl Player"}
+                        <h3 className="text-white font-semibold text-lg drop-shadow-md line-clamp-1 w-full" title={currentTrack?.title || tr.playerFallbackTitle}>
+                            {currentTrack?.title || tr.playerFallbackTitle}
                         </h3>
                         <p className="text-gray-400 text-sm line-clamp-1">{currentTrack?.artist || "Load a playlist to start"}</p>
                     </div>
@@ -329,7 +350,20 @@ export function PlayerTile() {
                             <SkipBack className="w-5 h-5" />
                         </button>
                         <button
-                            onClick={togglePlay}
+                            onClick={() => {
+                                // Call player API directly within user gesture context
+                                // (useEffect is async and loses the gesture context, causing autoplay policy blocks)
+                                if (player && isPlayerReady) {
+                                    try {
+                                        if (isPlaying) {
+                                            player.pauseVideo();
+                                        } else {
+                                            player.playVideo();
+                                        }
+                                    } catch (err) { }
+                                }
+                                togglePlay();
+                            }}
                             disabled={!currentTrack || !currentTrack.id}
                             className="p-4 rounded-full bg-accent hover:bg-accent/80 transition-all transform hover:scale-105 shadow-lg shadow-accent/20 disabled:opacity-50 disabled:hover:scale-100"
                         >
@@ -353,13 +387,13 @@ export function PlayerTile() {
             <div className="relative z-10 flex flex-col h-full w-full md:w-64 lg:w-80 shrink-0">
                 <div className="flex items-center justify-between mb-4 relative" ref={menuRef}>
                     <h2 className="text-lg font-bold text-accent-foreground flex items-center gap-2">
-                        <span>Up Next</span>
+                        <span>{tr.upNext}</span>
                         <ListMusic className="w-4 h-4 text-accent opacity-70" />
                     </h2>
 
                     <div className="flex items-center gap-1">
                         {/* Infinite Status Icon */}
-                        <div className="p-1 relative z-20 flex items-center justify-center" title={isInfinite ? "Infinite Mode Active" : "Infinite Mode Off"}>
+                        <div className="p-1 relative z-20 flex items-center justify-center" title={isInfinite ? tr.infiniteModeActive : ""}>
                             <Infinity className={`w-5 h-5 transition-all duration-500 ${isInfinite ? 'text-accent brightness-150 drop-shadow-[0_0_8px_var(--accent)]' : 'text-black drop-shadow-none'}`} />
                         </div>
 
@@ -384,11 +418,11 @@ export function PlayerTile() {
                                 className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
                             >
                                 <Shuffle className="w-4 h-4 text-gray-400 group-hover:text-accent transition-colors" />
-                                プレイリストをシャッフル
+                                {tr.shufflePlaylist}
                             </button>
                             <button
                                 onClick={() => {
-                                    if (window.confirm("プレイリストを削除しますか？")) {
+                                    if (window.confirm(tr.confirmDelete)) {
                                         clearQueue();
                                         pause();
                                         triggerCreatorReset();
@@ -399,7 +433,7 @@ export function PlayerTile() {
                                 className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-3 transition-colors mt-1 disabled:opacity-50 disabled:cursor-not-allowed group"
                             >
                                 <Trash2 className="w-4 h-4 text-red-400/70 group-hover:text-red-400 transition-colors" />
-                                プレイリストを削除
+                                {tr.deletePlaylist}
                             </button>
                         </div>
                     )}
@@ -414,12 +448,12 @@ export function PlayerTile() {
                         queue.map((track, i) => {
                             if (!track || typeof track !== 'object') return null;
                             const trackId = track.id ? String(track.id) : `unknown-${i}`;
-                            const title = track.title ? String(track.title) : "Unknown Title";
+                            const title = track.title ? String(track.title) : tr.unknownTitle;
                             const artist = track.artist ? String(track.artist) : "Unknown Artist";
                             const thumb = track.thumbnailUrl ? String(track.thumbnailUrl) : "";
 
                             return (
-                                <div key={`queue-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors group/item">
+                                <div key={`queue-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 transition-colors group/item cursor-pointer" onClick={() => skipToTrack(i)}>
                                     <div className="w-12 h-10 bg-black/40 rounded-md shrink-0 flex flex-col items-center justify-center relative overflow-hidden outline outline-1 outline-white/10">
                                         {thumb && thumb.length > 5 ? (
                                             <img
@@ -432,11 +466,11 @@ export function PlayerTile() {
                                                 }}
                                             />
                                         ) : (
-                                            <span className="text-[8px] text-gray-500">No Img</span>
+                                            <span className="text-[8px] text-gray-500">{tr.noImg}</span>
                                         )}
                                     </div>
                                     <div className="flex flex-col flex-1 min-w-0">
-                                        <span className="text-sm font-semibold text-white truncate group-hover/item:text-[#8ebce3] transition-colors">
+                                        <span className="text-sm font-semibold text-white truncate group-hover/item:text-accent transition-colors">
                                             {title}
                                         </span>
                                         <div className="flex items-center text-[10px] text-gray-400 gap-2 mt-0.5">

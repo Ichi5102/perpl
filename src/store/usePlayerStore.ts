@@ -56,6 +56,7 @@ interface PlayerState {
 
     nextTrack: () => void;
     prevTrack: () => void;
+    skipToTrack: (index: number) => void;
 
     // Reset UI Triggers
     resetCreatorTrigger: number;
@@ -150,6 +151,25 @@ export const usePlayerStore = create<PlayerState>()(
 
                 set({
                     currentTrack: prev,
+                    queue: newQueue,
+                    history: newHistory,
+                    isPlaying: true,
+                });
+            },
+
+            skipToTrack: (index) => {
+                const { queue, currentTrack, history } = get();
+                if (index < 0 || index >= queue.length) return;
+
+                const skippedTracks = queue.slice(0, index);
+                const target = queue[index];
+                const newQueue = queue.slice(index + 1);
+                const newHistory = currentTrack
+                    ? [...history, currentTrack, ...skippedTracks]
+                    : [...history, ...skippedTracks];
+
+                set({
+                    currentTrack: target,
                     queue: newQueue,
                     history: newHistory,
                     isPlaying: true,

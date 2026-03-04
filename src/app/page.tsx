@@ -14,38 +14,38 @@ export default function Home() {
       </div>
 
       {/* Header */}
-      <header className="w-full relative z-10 flex justify-start items-end pb-4 pt-8 pl-12 md:pl-28 pr-4 md:pr-8">
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight text-accent leading-none" style={{ fontFamily: "var(--font-kanit), sans-serif", letterSpacing: "-0.05em" }}>
+      <header className="w-full relative z-10 flex justify-start items-end pb-4 pt-6 pl-6 md:pl-28 pr-4 md:pr-8">
+        <h1 className="text-4xl md:text-7xl font-thin tracking-[0.15em] text-[#9370db] leading-none" style={{ fontFamily: "var(--font-logo), sans-serif" }}>
           Perpl
         </h1>
       </header>
 
       {/* Main Dashboard Content */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto p-4 md:px-8 pb-8 flex flex-col justify-center relative z-10">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-[300px] lg:auto-rows-[360px]">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 auto-rows-auto lg:auto-rows-[360px]">
           {/* 1. Unified Player & Queue Tile */}
-          <div className="lg:col-span-3 lg:row-span-2 h-full">
+          <div className="lg:col-span-3 lg:row-span-2 h-[600px] lg:h-full">
             <ErrorBoundary fallbackName="Player & Queue">
               <PlayerTile />
             </ErrorBoundary>
           </div>
 
           {/* 2. Playlist Creator Tile */}
-          <div className="lg:col-span-1 lg:row-span-2 h-full">
+          <div className="lg:col-span-1 lg:row-span-2 h-[720px] lg:h-full">
             <ErrorBoundary fallbackName="Playlist Creator">
               <PlaylistCreatorTile />
             </ErrorBoundary>
           </div>
 
           {/* 3. History Tile */}
-          <div className="lg:col-span-2 row-span-1 h-full">
+          <div className="lg:col-span-2 row-span-1 h-[300px] lg:h-full">
             <ErrorBoundary fallbackName="History">
               <HistoryTile />
             </ErrorBoundary>
           </div>
 
           {/* 4. Settings Tile */}
-          <div className="lg:col-span-2 row-span-1 h-full">
+          <div className="lg:col-span-2 row-span-1 h-[300px] lg:h-full">
             <ErrorBoundary fallbackName="Settings">
               <SettingsTile />
             </ErrorBoundary>

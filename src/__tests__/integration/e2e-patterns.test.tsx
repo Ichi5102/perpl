@@ -59,6 +59,9 @@ vi.mock('@/store/usePlayerStore', () => ({
 vi.mock('@/store/useSettingsStore', () => ({
     useSettingsStore: () => ({
         volume: 50,
+        locale: 'en',
+        setVolume: vi.fn(),
+        setLocale: vi.fn(),
     }),
 }));
 
@@ -92,7 +95,7 @@ describe('アーティスト検索・選択', () => {
             expect(screen.getByText('Create Playlist')).toBeInTheDocument();
         });
 
-        const input = screen.getByPlaceholderText('Type artist name & press Enter...');
+        const input = screen.getByPlaceholderText('Type artist name...');
 
         // Type to trigger autocomplete - should call our API route, NOT iTunes directly
         await act(async () => {
@@ -117,7 +120,7 @@ describe('アーティスト検索・選択', () => {
             expect(screen.getByText('Create Playlist')).toBeInTheDocument();
         });
 
-        const input = screen.getByPlaceholderText('Type artist name & press Enter...');
+        const input = screen.getByPlaceholderText('Type artist name...');
         fireEvent.change(input, { target: { value: '   ' } });
 
         // Wait enough time for debounce
@@ -135,9 +138,9 @@ describe('アーティスト検索・選択', () => {
             expect(screen.getByText('Create Playlist')).toBeInTheDocument();
         });
 
-        const input = screen.getByPlaceholderText('Type artist name & press Enter...');
+        const input = screen.getByPlaceholderText('Type artist name...');
         expect(input).not.toBeDisabled();
-        expect(input.getAttribute('placeholder')).toBe('Type artist name & press Enter...');
+        expect(input.getAttribute('placeholder')).toBe('Type artist name...');
         // Should NOT say "Set API Key in Settings"
         expect(input.getAttribute('placeholder')).not.toContain('API Key');
     });
@@ -330,7 +333,7 @@ describe('設定画面', () => {
         render(<SettingsTile />);
 
         await waitFor(() => {
-            expect(screen.getByText('Troubleshooting')).toBeInTheDocument();
+            expect(screen.getByText('Advanced')).toBeInTheDocument();
         });
 
         expect(screen.getByText('Clear Player State (Fix Crash)')).toBeInTheDocument();
@@ -416,7 +419,7 @@ describe('状態リセット', () => {
         });
 
         // Component should render without errors even when reset trigger fires
-        expect(screen.getByPlaceholderText('Type artist name & press Enter...')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Type artist name...')).toBeInTheDocument();
     });
 });
 

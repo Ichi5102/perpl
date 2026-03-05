@@ -14,13 +14,24 @@ export const useSettingsStore = create<SettingsState>()(
     persist(
         (set) => ({
             volume: 50,
-            locale: 'en',
+            locale: 'ja',
 
             setVolume: (volume) => set({ volume }),
             setLocale: (locale) => set({ locale }),
         }),
         {
             name: 'perpl-settings-storage',
+            version: 1,
+            migrate: (persistedState, version) => {
+                if (version === 0) {
+                    // 古いバージョンの設定を破棄して初期状態を返す
+                    return {
+                        volume: 50,
+                        locale: 'ja',
+                    };
+                }
+                return persistedState as SettingsState;
+            },
         }
     )
 );

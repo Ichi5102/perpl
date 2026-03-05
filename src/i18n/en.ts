@@ -40,9 +40,13 @@ export const en = {
     // SettingsTile
     settings: "Settings",
     volume: "Volume",
+    volumeIOSMessage: "Use device volume buttons",
     advanced: "Advanced",
     clearPlayerState: "Clear Player State (Fix Crash)",
     language: "Language",
+
+    // iOS
+    tapToPlay: "Tap to Play",
 } as const;
 
 export type TranslationKeys = keyof typeof en;

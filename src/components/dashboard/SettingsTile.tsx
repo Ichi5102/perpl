@@ -43,29 +43,39 @@ export function SettingsTile() {
                         <Volume2 className="w-4 h-4 text-accent" />
                         {t.volume}
                     </label>
-                    <div className="flex items-center gap-4 bg-black/40 p-3 rounded-xl border border-white/5">
-                        <div className="relative flex-1 h-3 group/slider cursor-pointer flex items-center">
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={volume}
-                                onChange={(e) => setVolume(Number(e.target.value))}
-                                className="absolute w-full h-full opacity-0 cursor-pointer z-20"
-                            />
-                            <div className="w-full h-1 bg-white/30 rounded-full relative">
-                                <div
-                                    className="h-full bg-accent group-hover/slider:bg-accent-foreground transition-colors rounded-full"
-                                    style={{ width: `${volume}%` }}
-                                />
-                                {/* Circular Thumb */}
-                                <div
-                                    className="w-3 h-3 bg-white rounded-full absolute top-1/2 -translate-y-1/2 -translate-x-1.5 shadow-sm pointer-events-none transition-transform group-hover/slider:scale-125"
-                                    style={{ left: `${volume}%` }}
-                                ></div>
-                            </div>
-                        </div>
-                        <span className="text-xs font-mono text-gray-400 w-8 text-right">{volume}%</span>
+                    <div className="flex items-center justify-center bg-black/40 p-3 rounded-xl border border-white/5 min-h-[42px]">
+                        {(() => {
+                            const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+                            if (isIOS) {
+                                return <span className="text-xs text-gray-400 font-medium text-center">{t.volumeIOSMessage}</span>;
+                            }
+                            return (
+                                <>
+                                    <div className="relative flex-1 h-3 group/slider cursor-pointer flex items-center">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            value={volume}
+                                            onChange={(e) => setVolume(Number(e.target.value))}
+                                            className="absolute w-full h-full opacity-0 cursor-pointer z-20"
+                                        />
+                                        <div className="w-full h-1 bg-white/30 rounded-full relative">
+                                            <div
+                                                className="h-full bg-accent group-hover/slider:bg-accent-foreground transition-colors rounded-full"
+                                                style={{ width: `${volume}%` }}
+                                            />
+                                            {/* Circular Thumb */}
+                                            <div
+                                                className="w-3 h-3 bg-white rounded-full absolute top-1/2 -translate-y-1/2 -translate-x-1.5 shadow-sm pointer-events-none transition-transform group-hover/slider:scale-125"
+                                                style={{ left: `${volume}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-mono text-gray-400 w-8 text-right ml-4">{volume}%</span>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
 

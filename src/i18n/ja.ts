@@ -42,7 +42,11 @@ export const ja: Record<TranslationKeys, string> = {
     // SettingsTile
     settings: "設定",
     volume: "音量",
+    volumeIOSMessage: "デバイスの音量ボタンで調整",
     advanced: "高度な設定",
     clearPlayerState: "全てリセット",
     language: "言語",
+
+    // iOS
+    tapToPlay: "タップして再生",
 };

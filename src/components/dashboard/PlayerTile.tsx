@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, ListMusic, Infinity, Trash2, Shuffle, Menu } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, ListMusic, Infinity, Trash2, Shuffle, Menu, X } from "lucide-react";
 import YouTube, { YouTubeProps, YouTubePlayer } from "react-youtube";
 import axios from "axios";
 import { usePlayerStore, Track } from "@/store/usePlayerStore";
@@ -31,6 +31,8 @@ export function PlayerTile() {
     const [player, setPlayer] = useState<YouTubePlayer | null>(null);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
+    const [isQueuePopupOpen, setIsQueuePopupOpen] = useState(false);
 
     // Infinite fetching state
     const [isFetchingInfinite, setIsFetchingInfinite] = useState(false);
@@ -64,11 +66,12 @@ export function PlayerTile() {
             if (typeof event.target.setVolume === 'function') {
                 event.target.setVolume(volume);
             }
-            // Auto-play on page load / reload
-            if (currentTrack?.id && typeof event.target.loadVideoById === 'function') {
+            // Auto-play on page load / reload (iOS support via cueVideoById)
+            if (currentTrack?.id && typeof event.target.cueVideoById === 'function') {
                 isTransitioningRef.current = true;
                 lastRequestedVideoIdRef.current = currentTrack.id;
-                event.target.loadVideoById(currentTrack.id);
+                event.target.cueVideoById(currentTrack.id);
+                setNeedsTapToPlay(true);
             }
         } catch (err) {
             console.warn("YouTube player onReady init error:", err);
@@ -80,6 +83,7 @@ export function PlayerTile() {
         if (event.data === 1) {
             // Video started playing — transition complete, sync store
             isTransitioningRef.current = false;
+            setNeedsTapToPlay(false); // Reset overlay if autoplay succeeds
             if (!isPlaying) play();
         } else if (event.data === 2) {
             // Only sync user-initiated pause (not YouTube's internal pause during loading)
@@ -115,6 +119,8 @@ export function PlayerTile() {
                     event.target.playVideo();
                 }
             } catch { }
+            // Play might fail silently on iOS, show tap-to-play overlay just in case
+            setNeedsTapToPlay(true);
         }
     };
 
@@ -209,6 +215,7 @@ export function PlayerTile() {
             modestbranding: 1,
             rel: 0,
             iv_load_policy: 3,
+            playsinline: 1,
         },
     };
 
@@ -231,6 +238,12 @@ export function PlayerTile() {
     if (!mounted) return <div className="glass-tile w-full h-full animate-pulse"></div>;
 
     const bgImage = currentTrack?.thumbnailUrl ? `url("${currentTrack.thumbnailUrl}")` : 'none';
+
+    const handleTrackSelect = (index: number) => {
+        skipToTrack(index);
+        setIsQueuePopupOpen(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     return (
         <div className="glass-tile w-full h-full p-6 relative overflow-hidden group hover:border-accent/50 transition-colors duration-300 flex flex-col md:flex-row gap-6">
@@ -271,6 +284,26 @@ export function PlayerTile() {
 
                         {/* Overlay to catch clicks and prevent pausing from iframe */}
                         <div className="absolute inset-0 z-20 cursor-pointer" onClick={togglePlay}></div>
+
+                        {/* iOS Tap to Play Overlay */}
+                        {needsTapToPlay && currentTrack?.id && (
+                            <div
+                                className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer group/overlay transition-all"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (player && typeof player.playVideo === 'function') {
+                                        player.playVideo();
+                                    }
+                                    setNeedsTapToPlay(false);
+                                    play();
+                                }}
+                            >
+                                <div className="p-4 rounded-full bg-accent/80 text-white shadow-lg group-hover/overlay:scale-110 transition-transform mb-2">
+                                    <Play className="w-8 h-8 fill-current translate-x-0.5" />
+                                </div>
+                                <span className="text-white font-bold tracking-wide drop-shadow-md">{tr.tapToPlay}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -323,11 +356,24 @@ export function PlayerTile() {
                             <SkipForward className="w-5 h-5" />
                         </button>
                     </div>
+
+                    {/* Mobile Up Next Controls */}
+                    <div className="md:hidden flex items-center justify-center gap-6 mt-4 opacity-80">
+                        <div className="p-2 rounded-full bg-white/5 flex items-center justify-center" title={isInfinite ? tr.infiniteModeActive : ""}>
+                            <Infinity className={`w-5 h-5 transition-all duration-500 ${isInfinite ? 'text-accent brightness-150 drop-shadow-[0_0_8px_var(--accent)]' : 'text-gray-400 drop-shadow-none'}`} />
+                        </div>
+                        <button
+                            onClick={() => setIsQueuePopupOpen(true)}
+                            className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                        >
+                            <ListMusic className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Right: Up Next Section */}
-            <div className="relative z-10 flex flex-col h-full w-full md:w-64 lg:w-80 shrink-0">
+            {/* Right: Up Next Section (Desktop) */}
+            <div className="relative z-10 hidden md:flex flex-col h-full w-full md:w-64 lg:w-80 shrink-0">
                 <div className="flex items-center justify-between mb-4 relative" ref={menuRef}>
                     <h2 className="text-lg font-bold text-accent-foreground flex items-center gap-2">
                         <span>{tr.upNext}</span>
@@ -396,7 +442,7 @@ export function PlayerTile() {
                             const thumb = track.thumbnailUrl ? String(track.thumbnailUrl) : "";
 
                             return (
-                                <div key={`queue-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 transition-colors group/item cursor-pointer" onClick={() => skipToTrack(i)}>
+                                <div key={`queue-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 transition-colors group/item cursor-pointer" onClick={() => handleTrackSelect(i)}>
                                     <div className="w-12 h-10 bg-black/40 rounded-md shrink-0 flex flex-col items-center justify-center relative overflow-hidden outline outline-1 outline-white/10">
                                         {thumb && thumb.length > 5 ? (
                                             <img
@@ -426,6 +472,116 @@ export function PlayerTile() {
                     )}
                 </div>
             </div>
+
+            {/* Mobile Queue Popup */}
+            {isQueuePopupOpen && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 md:hidden">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsQueuePopupOpen(false)}></div>
+                    <div className="glass-tile w-full max-h-[80vh] flex flex-col p-6 relative z-10 transition-all duration-300">
+                        <div className="flex items-center justify-between mb-4 relative" ref={menuRef}>
+                            <h2 className="text-lg font-bold text-accent-foreground flex items-center gap-2">
+                                <span>{tr.upNext}</span>
+                                <ListMusic className="w-4 h-4 text-accent opacity-70" />
+                            </h2>
+
+                            <div className="flex items-center gap-1">
+                                <div className="p-1 relative z-20 flex items-center justify-center" title={isInfinite ? tr.infiniteModeActive : ""}>
+                                    <Infinity className={`w-5 h-5 transition-all duration-500 ${isInfinite ? 'text-accent brightness-150 drop-shadow-[0_0_8px_var(--accent)]' : 'text-gray-400'}`} />
+                                </div>
+                                <button
+                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors relative z-20"
+                                >
+                                    <Menu className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setIsQueuePopupOpen(false)}
+                                    className="p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors ml-2"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Dropdown Menu Mobile */}
+                            {isMenuOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#151515] border border-white/10 rounded-xl shadow-2xl py-2 z-30">
+                                    <button
+                                        onClick={() => {
+                                            shuffleQueue();
+                                            setIsMenuOpen(false);
+                                        }}
+                                        disabled={!queue || queue.length < 2}
+                                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 flex items-center gap-3 transition-colors disabled:opacity-50"
+                                    >
+                                        <Shuffle className="w-4 h-4 text-gray-400" />
+                                        {tr.shufflePlaylist}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm(tr.confirmDelete)) {
+                                                clearQueue();
+                                                pause();
+                                                triggerCreatorReset();
+                                            }
+                                            setIsMenuOpen(false);
+                                            setIsQueuePopupOpen(false);
+                                        }}
+                                        disabled={!currentTrack && (!queue || queue.length === 0)}
+                                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 flex items-center gap-3 transition-colors mt-1 disabled:opacity-50"
+                                    >
+                                        <Trash2 className="w-4 h-4 text-red-400" />
+                                        {tr.deletePlaylist}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                            {!queue || !Array.isArray(queue) || queue.length === 0 ? (
+                                <div className="text-gray-500 text-sm italic text-center mt-10">
+                                    Queue is empty
+                                </div>
+                            ) : (
+                                queue.map((track, i) => {
+                                    if (!track || typeof track !== 'object') return null;
+                                    const trackId = track.id ? String(track.id) : `unknown-${i}`;
+                                    const title = track.title ? String(track.title) : tr.unknownTitle;
+                                    const artist = track.artist ? String(track.artist) : "Unknown Artist";
+                                    const thumb = track.thumbnailUrl ? String(track.thumbnailUrl) : "";
+
+                                    return (
+                                        <div key={`queue-mobile-${trackId}-${i}`} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 transition-colors group/item cursor-pointer" onClick={() => handleTrackSelect(i)}>
+                                            <div className="w-12 h-10 bg-black/40 rounded-md shrink-0 flex flex-col items-center justify-center relative overflow-hidden outline outline-1 outline-white/10">
+                                                {thumb && thumb.length > 5 ? (
+                                                    <img
+                                                        src={thumb}
+                                                        alt={title}
+                                                        className="w-full h-full object-cover opacity-80"
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display = 'none';
+                                                            e.currentTarget.src = '';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span className="text-[8px] text-gray-500">{tr.noImg}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col flex-1 min-w-0">
+                                                <span className="text-sm font-semibold text-white truncate group-hover/item:text-accent transition-colors">
+                                                    {title}
+                                                </span>
+                                                <div className="flex items-center text-[10px] text-gray-400 gap-2 mt-0.5">
+                                                    <span className="truncate">{artist}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

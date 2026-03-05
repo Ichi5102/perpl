@@ -3,6 +3,7 @@ import { PlaylistCreatorTile } from "@/components/dashboard/PlaylistCreatorTile"
 import { HistoryTile } from "@/components/dashboard/HistoryTile";
 import { SettingsTile } from "@/components/dashboard/SettingsTile";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { TutorialWrapper } from "@/components/dashboard/TutorialWrapper";
 
 export default function Home() {
   return (
@@ -14,10 +15,11 @@ export default function Home() {
       </div>
 
       {/* Header */}
-      <header className="w-full relative z-10 flex justify-start items-end pb-4 pt-6 pl-6 md:pl-28 pr-4 md:pr-8">
+      <header className="w-full relative z-50 flex justify-between items-end pb-4 pt-6 pl-6 md:pl-28 pr-6 md:pr-28">
         <h1 className="text-4xl md:text-7xl tracking-tight text-[#9370db] leading-none flex items-end gap-2" style={{ fontFamily: "var(--font-logo), sans-serif" }}>
           <span className="font-black">Perpl</span>
         </h1>
+        <TutorialWrapper />
       </header>
 
       {/* Main Dashboard Content */}
@@ -56,7 +58,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="w-full relative z-10 py-6 text-center">
         <span className="text-xs md:text-sm text-gray-500 font-sans tracking-wide opacity-50">
-          Developed by Taichi Hirano
+          Developed by Ichi
         </span>
       </footer>
     </div>

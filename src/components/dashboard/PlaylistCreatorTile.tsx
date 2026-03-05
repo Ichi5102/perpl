@@ -190,6 +190,9 @@ export function PlaylistCreatorTile() {
 
                 // APIトークン消費抑制のためにも、生成後はアーティストタグをクリアする
                 setSelectedArtists([]);
+
+                // トップへスクロール
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
                 alert("Could not generate a playlist (No suitable tracks found). Try a different artist.");
             }

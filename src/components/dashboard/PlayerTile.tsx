@@ -8,6 +8,7 @@ import { usePlayerStore, Track } from "@/store/usePlayerStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { getTranslations } from "@/i18n";
 import { ProgressBar } from "./ProgressBar";
+import { createPortal } from "react-dom";
 
 export function PlayerTile() {
     const {
@@ -474,8 +475,8 @@ export function PlayerTile() {
             </div>
 
             {/* Mobile Queue Popup */}
-            {isQueuePopupOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 md:hidden">
+            {isQueuePopupOpen && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 md:hidden" style={{ zIndex: 9999 }}>
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsQueuePopupOpen(false)}></div>
                     <div className="glass-tile w-full max-h-[80vh] flex flex-col p-6 relative z-10 transition-all duration-300">
                         <div className="flex items-center justify-between mb-4 relative" ref={menuRef}>
@@ -580,7 +581,8 @@ export function PlayerTile() {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
         </div>

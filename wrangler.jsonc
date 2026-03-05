@@ -16,5 +16,11 @@
             "binding": "WORKER_SELF_REFERENCE",
             "service": "perpl"
         }
+    ],
+    "kv_namespaces": [
+        {
+            "binding": "YOUTUBE_CACHE",
+            "id": "75d526c50e10425eaf778c6bf97fef8c"
+        }
     ]
 }

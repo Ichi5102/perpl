@@ -174,10 +174,11 @@ export function PlayerTile() {
                 });
 
                 if (res?.data?.playlist && Array.isArray(res.data.playlist)) {
-                    // Filter out tracks that are currently playing, or already played
+                    // 過去に再生した直近30曲のみを除外する
+                    const recentHistory = history.slice(-30);
                     const excludeIds = new Set([
                         currentTrack?.id,
-                        ...history.map(t => t.id)
+                        ...recentHistory.map(t => t.id)
                     ]);
 
                     const potentialTracks: Track[] = res.data.playlist.map((t: Record<string, unknown>) => ({
